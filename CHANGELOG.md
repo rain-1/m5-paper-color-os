@@ -5,6 +5,16 @@ compatibility, minor changes add features, patch changes fix or refine behaviour
 The current API and device screen use the same version. Release binaries are
 application images for the existing 16 MB partition layout.
 
+## 0.4.0
+
+- TXT book import, normalization preview, SD library and prepared-text download.
+- Offline button-driven reader/menu, measured word wrapping and browser page jumps.
+- Saved per-book positions/bookmarks in NVS and automatic last-book restoration.
+- Five reading fonts, offset-preserving reflow and an on-device comparison sheet.
+- Short actions on button release; hold A bookmarks, hold B opens Wi-Fi, hold C
+  retains OTA unlock. Busy reader actions cannot queue accidental page turns.
+- Active reading survives network state changes; existing picture and OTA features retained.
+
 ## 0.3.0
 
 - Consistent sound/LED cues for connection, saved pictures, failures, busy state,

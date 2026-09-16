@@ -5,7 +5,7 @@ constexpr char GALLERY_HTML[] = R"HTML(<!doctype html><html lang="en"><meta char
 *{box-sizing:border-box}body{font:17px system-ui;background:#f4f1e8;color:#19231e;margin:0}main{max-width:850px;margin:auto;padding:30px}
 h1{font-size:44px;letter-spacing:-2px}section{padding:22px 0;border-top:2px solid #195d3b}button,input,select{font:inherit;padding:10px;margin:8px 0;max-width:100%}
 button{background:#195d3b;color:white;border:0;border-radius:6px;cursor:pointer}button:disabled{opacity:.5}canvas{display:block;width:200px;height:300px;background:white;border:1px solid #999;margin:15px 0}label{display:block}#message{min-height:3em;white-space:pre-wrap}li{margin:8px 0;overflow-wrap:anywhere}a{color:#195d3b}small{color:#526158}
-</style><main><nav>Paper OS / <a href="/device">Device lab &amp; updates</a></nav><h1>Put something<br>on paper.</h1>
+</style><main><nav>Paper OS / <a href="/books">Books</a> / <a href="/device">Device lab &amp; updates</a></nav><h1>Put something<br>on paper.</h1>
 <p id="card">Checking SD card…</p><section><label>Choose a JPEG or PNG <input id="file" type="file" accept="image/jpeg,image/png"></label>
 <small>Maximum 12 MB, 24 megapixels, 12,000 pixels per side. Conversion stays in this browser.</small>
 <label>Colour treatment <select id="dither"><option value="yes">Floyd–Steinberg dithering</option><option value="no">Solid six colours</option></select></label>

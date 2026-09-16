@@ -3,6 +3,8 @@
 #include "gallery.h"
 #include "device.h"
 #include "feedback.h"
+#include "reader.h"
+#include "book_storage.h"
 #include <SD.h>
 #include <SPI.h>
 #include <esp_system.h>
@@ -69,6 +71,8 @@ void picturesRoutes(WebServer& s, void (*display)(const char*)) {
     const char* headers[] = {"X-Paper-Token", "Content-Type"};
     s.collectHeaders(headers, 2);
     deviceRoutes(s,sessionToken);
+    Reader::routes(s,sessionToken);
+    bookStorageRoutes(s,sessionToken);
     s.on("/gallery", HTTP_GET, [&s] { picturesPage(s); });
     s.on("/converter.js", HTTP_GET, [&s] { s.send_P(200, "text/javascript", CONVERTER_JS); });
     s.on("/api/card", HTTP_GET, [&s] {
@@ -99,6 +103,7 @@ void picturesRoutes(WebServer& s, void (*display)(const char*)) {
     });
     s.on("/api/display", HTTP_POST, [&s,display] {
         if (!authorized(s)) { error(s,403,"Reload the page before trying again."); return; }
+        if (Reader::busy()) { error(s,409,"Reader is refreshing. Please wait."); return; }
         String path=s.arg("path");
         if (!picture::path(path.c_str())) { error(s,400,"Invalid picture path."); return; }
         Lock lock;

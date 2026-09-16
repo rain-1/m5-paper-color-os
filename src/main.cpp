@@ -10,13 +10,14 @@
 #include "device.h"
 #include "feedback.h"
 #include "version.h"
+#include "reader.h"
 
 namespace {
 constexpr uint32_t CONNECT_TIMEOUT = 30000;
 constexpr uint32_t PORTAL_GRACE = 20000;
 const IPAddress PORTAL_IP(192, 168, 4, 1);
 struct Credentials { char ssid[33]; char password[64]; };
-struct Screen { bool setup; char network[33]; char password[17]; char ip[16]; bool boot; char picture[64]; int battery; };
+struct Screen { bool setup; char network[33]; char password[17]; char ip[16]; bool boot; char picture[64]; int battery; bool reader; };
 Preferences prefs;
 WebServer server(80);
 DNSServer dns;
@@ -35,6 +36,7 @@ String randomHex() {
 }
 
 void showScreen(bool setup) {
+    if (Reader::active()) return;
     Screen screen{};
     screen.setup = setup;
     screen.battery = M5.Power.getBatteryLevel();
@@ -58,6 +60,17 @@ void displayTask(void*) {
     while (true) {
         xQueueReceive(screenQueue, &screen, portMAX_DELAY);
         xSemaphoreTake(pictureBus, portMAX_DELAY);
+        if (screen.reader) {
+            if (Reader::render(canvas, screen.battery)) {
+                M5.Display.setEpdMode(epd_mode_t::epd_fastest);
+                canvas.pushSprite(0,0);
+                M5.Display.waitDisplay();
+                M5.Display.setEpdMode(epd_mode_t::epd_quality);
+            }
+            Reader::displayed();
+            xSemaphoreGive(pictureBus);
+            continue;
+        }
         if (screen.picture[0]) {
             if (picturesDraw(canvas, screen.picture)) {
                 canvas.pushSprite(0,0);
@@ -104,7 +117,7 @@ void displayTask(void*) {
             canvas.drawString("Open this address in your browser", 24, 430);
             canvas.drawString("for pictures and the device lab.", 24, 454);
         }
-        canvas.drawString("A: status / Hold lower-left B: Wi-Fi", 24, 535);
+        canvas.drawString("Top C: reader / Hold left B: Wi-Fi", 24, 535);
         canvas.drawString(String("v") + PAPER_OS_VERSION + " / Battery: " + screen.battery + "%", 24, 565);
         canvas.pushSprite(0, 0);
         M5.Display.waitDisplay();
@@ -129,6 +142,7 @@ void setupRoutes() {
         reply(200, page);
     });
     picturesRoutes(server, [](const char* path) {
+        Reader::leave();
         Screen screen{};
         strlcpy(screen.picture,path,sizeof(screen.picture));
         xQueueOverwrite(screenQueue,&screen);
@@ -211,6 +225,12 @@ void setup() {
     Feedback::begin();
     if (!pictureBus) { Serial.println("SPI mutex allocation failed"); while(true) delay(1000); }
     screenQueue = xQueueCreate(1, sizeof(Screen));
+    Reader::begin([] {
+        Screen screen{};
+        screen.reader = true;
+        screen.battery = M5.Power.getBatteryLevel();
+        xQueueOverwrite(screenQueue, &screen);
+    });
     if (!screenQueue || xTaskCreate(displayTask, "paper-display", 8192, nullptr, 1, nullptr) != pdPASS) {
         Serial.println("Display task initialization failed");
         while (true) delay(1000);
@@ -234,16 +254,41 @@ void setup() {
         splash.boot = true;
         xQueueOverwrite(screenQueue, &splash);
         beginConnection(false);
+        Reader::resumeLast();
     }
     else startPortal();
 }
 
 void loop() {
     M5.update();
-    if (M5.BtnB.pressedFor(2500) && !portal) startPortal();
+    static bool aLong=false,bLong=false,cLong=false;
+    auto readerAction=[](Reader::Action action) {
+        if (!Reader::request(action)) Feedback::play(Feedback::Cue::Busy);
+    };
+    if (M5.BtnA.pressedFor(2500) && !aLong) {
+        aLong=true;
+        if (Reader::active()) readerAction(Reader::Action::Bookmark);
+    }
+    if (M5.BtnB.pressedFor(2500) && !bLong) {
+        bLong=true;
+        if (Reader::busy()) Feedback::play(Feedback::Cue::Busy);
+        else { Reader::leave(); if (portal) showScreen(true); else startPortal(); }
+    }
+    if (M5.BtnC.pressedFor(2500)) cLong=true;
     deviceTick();
     Feedback::tick();
-    if (M5.BtnA.wasPressed()) showScreen(portal);
+    if (M5.BtnA.wasReleased()) {
+        if (!aLong) { if (Reader::active()) readerAction(Reader::Action::Previous); else showScreen(portal); }
+        aLong=false;
+    }
+    if (M5.BtnB.wasReleased()) {
+        if (!bLong) readerAction(Reader::active()?Reader::Action::Next:Reader::Action::Menu);
+        bLong=false;
+    }
+    if (M5.BtnC.wasReleased()) {
+        if (!cLong) readerAction(Reader::active()?Reader::Action::Select:Reader::Action::Menu);
+        cLong=false;
+    }
     if (portal) dns.processNextRequest();
     server.handleClient();
     if (pendingConnect) { pendingConnect = false; beginConnection(true); }

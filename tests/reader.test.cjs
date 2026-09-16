@@ -1,0 +1,11 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('include/reader_page.h','utf8').split('R"JS(')[1].split(')JS"')[0];
+const context={module:{exports:{}}};vm.runInNewContext(source,context);
+const {prepareText}=context.module.exports;
+assert.equal(prepareText('\uFEFFHello\r\nworld.\r\n\r\nNext paragraph.'),'Hello world.\n\nNext paragraph.\n');
+assert.equal(prepareText('one\r\ntwo',false),'one\ntwo\n');
+assert.equal(prepareText('“Café” — déjà vu… Straße Æsir œuvre'),'"Cafe" -- deja vu... Strasse AEsir oeuvre\n');
+assert.equal(prepareText('a\tb',false),'a    b\n');
+for(const s of ['', '  \n', '漢字', 'a\0b', 'a'.repeat(1048576)])assert.throws(()=>prepareText(s));
+assert.equal(prepareText('a'.repeat(1048575)).length,1048576);
+console.log('Reader import: paragraph reflow, poetry, Latin normalization and limits passed.');

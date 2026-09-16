@@ -1,7 +1,7 @@
 # Paper OS
 
 Firmware for **M5Stack PaperColor (C151)**: splash/Wi-Fi setup, browser image
-conversion, an SD gallery, a device lab, and browser firmware updates. Built with Arduino/FreeRTOS,
+conversion, an SD gallery, a TXT book reader, a device lab, and browser firmware updates. Built with Arduino/FreeRTOS,
 M5Unified and M5GFX. This is a foundation for an appliance-style OS, not Linux.
 
 ## Build
@@ -64,13 +64,20 @@ separate task from display refreshes.
 ## Pictures, device lab and wireless updates
 
 Once connected, open the IP address shown on the screen in your browser. `/gallery`
-contains the converter and `/device` contains diagnostics and updates. Press **A**
-to return to the status screen and get a fresh battery estimate. With the display
+contains the converter, `/books` the TXT library, and `/device` diagnostics and updates.
+Press top **C** to enter the reader menu. Outside the reader, **A** refreshes status.
+Inside the reader, **A/B** turn pages or navigate and **C** chooses. With the display
 upright and USB at the bottom, **A** is upper-left, **B** is lower-left, and **C** is
 the single button on the top edge. Hold **B** to reconfigure Wi-Fi.
 Hold **C** for 2.5 seconds to unlock firmware updates for two
 minutes; a short beep and green LED flash confirm that you can release it.
 The lab page shows the remaining time.
+
+The [reader guide](docs/reader.md) covers TXT imports, five fonts and a font test
+sheet, automatic saved positions, bookmarks, offline reading and physical controls.
+The first reader normalizes Latin text to ASCII and has a 1 MiB prepared-book limit.
+Page turns still require the colour panel's full refresh; fast partial refresh and
+deep-sleep battery optimisation are not implemented.
 
 The image converter accepts JPEG/PNG, up to 12 MiB, 24 million pixels, and 12,000
 pixels on either side. It checks dimensions before decoding, fits the entire image
@@ -132,8 +139,8 @@ Event sounds can be muted persistently and previewed in the lab. See the
   accounts or TLS. Mutation requests require a page token; anyone on the LAN can
   load the page. OTA additionally requires the physical C-button unlock. Do not
   expose these services to the internet.
-- This milestone stays awake for Wi-Fi and buttons. Battery optimisation, app
-  navigation and more peripheral controls are future work.
+- This milestone stays awake for Wi-Fi and buttons. Battery optimisation and
+  more peripheral controls are future work.
 - Long refreshes mean the screen can lag behind network state by one refresh.
 
 ## Hardware acceptance checks

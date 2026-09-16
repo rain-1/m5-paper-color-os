@@ -32,3 +32,23 @@ low-battery and mid-upload power-loss experiments have not been performed.
 Visual colour
 accuracy, audible speaker output, LEDs, battery runtime, power-loss durability,
 full-card handling and automatic rollback have not been established by these checks.
+
+## 0.4.0 reader — host checks
+
+- Firmware build passed with the pinned Arduino/M5 libraries (about 1.13 MB app).
+- Address/undefined-behaviour-sanitized C++ pagination tests passed, including
+  500 randomized books that preserve every non-whitespace character, wrapping,
+  page offsets, oversized words and invalid text/IDs.
+- Node import tests passed for paragraph reflow, poetry, Latin normalization,
+  unsupported characters and size boundaries. Existing converter, image-format
+  and OTA-power policy tests also passed.
+- Real Chromium running the embedded Books HTML/JavaScript against mocked HTTP
+  endpoints passed: import preview, multipart body, library read controls, font
+  actions, busy state, unsupported text rejection and mobile layout.
+- `tests/reader_device.py BASE --exercise` is an opt-in live acceptance test. It
+  retains an original test book and tests actual SD upload/download, page changes,
+  bookmark recall, font reflow and NVS reload, then displays the font sampler.
+
+At this checkpoint, 0.4.0 has **not** been installed or hardware-validated: the
+device is running 0.3.0 and OTA is locked pending a physical C-button unlock.
+Physical typography, button gestures and restart restoration need device testing.

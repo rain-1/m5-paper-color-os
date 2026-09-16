@@ -120,7 +120,21 @@ can be considered implemented on hardware. Audible cues remain independent.
 - Accelerated transitions between the new full-page patterns await user testing;
   no claim of visual quality is made from timing/status telemetry alone.
 
-## 0.9.0 temporary display — host verified, pending installation
+## 0.9.1 prepared-picture dithering fix — host verified, pending installation
+
+- Shared SD/RAM picture branch now selects no-dither conversion for transfer,
+  waits for completion, then restores quality mode. Driver mode selection only
+  affects pixel conversion, not the physical refresh clock/waveform.
+- Host test compiles the pinned driver's actual palette/no-dither functions:
+  all 36 ordered pairs of the six prepared colours preserve the exact expected
+  native indices across every position of a 400×600 frame.
+- Converter tests and firmware build passed (1,153,609-byte application).
+- Physical solid-picture comparison awaits installation and user inspection.
+
+## 0.9.0 temporary display — installed
+
+- OTA accepted after physical unlock; live API confirmed 0.9.0, reconnection
+  and `otaSeconds: 0` after restart.
 
 - Firmware build passed (1,153,561-byte application); converter tests pass.
 - Chromium mocked-device tests verify Display only sends the exact prepared

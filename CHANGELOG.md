@@ -5,6 +5,13 @@ compatibility, minor changes add features, patch changes fix or refine behaviour
 The current API and device screen use the same version. Release binaries are
 application images for the existing 16 MB partition layout.
 
+## 0.9.1
+
+- Disable device-side dithering for prepared pictures (SD and RAM-only). Browser
+  Solid mode now remains solid; browser-dithered pictures are not dithered twice.
+- Use the pinned ED2208 driver's no-dither conversion mode during picture
+  transfer, then restore the default. No clock, waveform or refresh timing change.
+
 ## 0.9.0
 
 - Separate Display only action uploads to temporary RAM without any SD writes,

@@ -79,8 +79,13 @@ void displayTask(void*) {
         }
         if (screen.picture[0]) {
             if (picturesDraw(canvas, screen.picture)) {
+                // Prepared .p6 pixels are already quantized/dithered. On the
+                // pinned ED2208 driver, fastest selects NO dithering only;
+                // it does not change panel clocks or refresh waveforms.
+                M5.Display.setEpdMode(epd_mode_t::epd_fastest);
                 canvas.pushSprite(0,0);
                 M5.Display.waitDisplay();
+                M5.Display.setEpdMode(epd_mode_t::epd_quality);
                 Serial.println("Picture display complete");
             }
             xSemaphoreGive(pictureBus);

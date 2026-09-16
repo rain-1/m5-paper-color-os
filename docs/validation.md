@@ -49,6 +49,35 @@ full-card handling and automatic rollback have not been established by these che
   retains an original test book and tests actual SD upload/download, page changes,
   bookmark recall, font reflow and NVS reload, then displays the font sampler.
 
-At this checkpoint, 0.4.0 has **not** been installed or hardware-validated: the
-device is running 0.3.0 and OTA is locked pending a physical C-button unlock.
-Physical typography, button gestures and restart restoration need device testing.
+0.4.0 was installed over Wi-Fi after physical C-button unlock. The device
+reconnected with its saved credentials and reported version 0.4.0 and a software
+restart. OTA returned to locked. At installation the device reported no USB input,
+96% battery and 4,074 mV battery voltage, satisfying the battery-only update guard.
+
+Live reader checks established:
+
+- Original sample book `/books/c69ab9f5.txt` uploaded to SD and downloaded unchanged.
+- Sample opened as nine pages in default 12 pt serif; next/previous and page jump
+  worked. A bookmark was stored and recalled at byte offset 432.
+- Changing to 18 pt serif produced 17 pages and kept byte offset 432 (page 3);
+  changing back returned to page 2 of 9 at the same offset.
+- Menu/continue and reopening the book restored page 2 and the bookmark. Reopen
+  reads the actual per-book NVS record. The full live acceptance script passed,
+  and the font comparison sheet was left on screen for visual inspection.
+- Live Chromium loaded the device's Books page, read reader state, prepared a
+  Latin-accented TXT preview correctly, and passed mobile layout/script checks.
+- Startup display refresh can temporarily block the SD bus even while reader
+  `busy` is false. The acceptance script now retries that expected HTTP 409.
+
+Physical typography, button gestures and restart restoration still need user/device
+testing; HTTP state alone does not establish what the panel looks like.
+
+### Known LED failure
+
+The user reports no visible output from LED tests. Inspection of the pinned
+M5Unified `LED_Strip_Class.cpp` found the legacy RMT (ESP-IDF 4.x) initialization
+branch is empty and returns false. This project uses Arduino 2.0.17 / ESP-IDF 4.x,
+so the current `M5.Led` calls silently fail. The lab endpoint does not check that
+failure and incorrectly returns success. Firmware 0.4.0 does **not** fix this;
+it needs a compatible LED backend and truthful test status before LED feedback
+can be considered implemented on hardware. Audible cues remain independent.

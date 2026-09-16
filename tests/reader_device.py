@@ -55,7 +55,16 @@ ready()
 request("/api/reader/action", b"action=next", expected=403)
 for body in [b"action=open&id=", b"action=open&id=../../x", b"action=font&value=5", b"action=jump&value=-1"]:
     request("/api/reader/action", body, token, "application/x-www-form-urlencoded", 400)
-books = request("/api/books")["books"]
+# The startup/status display also owns the SD bus, independently of reader busy.
+deadline = time.monotonic() + 100
+while True:
+    try:
+        books = request("/api/books")["books"]
+        break
+    except AssertionError as error:
+        if error.args[0][1] != 409 or time.monotonic() >= deadline:
+            raise
+        time.sleep(1)
 title = "Paper OS reader acceptance"
 book = next((b for b in books if b["title"] == title), None)
 sample = ("A quiet morning\n\n" + "The window looked out across a small garden. Light moved slowly over the leaves. There was time to read another page, and no need to hurry.\n\n" * 24).encode()

@@ -11,6 +11,7 @@
 #include "feedback.h"
 #include "version.h"
 #include "reader.h"
+#include "refresh_test.h"
 
 namespace {
 constexpr uint32_t CONNECT_TIMEOUT = 30000;
@@ -60,6 +61,11 @@ void displayTask(void*) {
     while (true) {
         xQueueReceive(screenQueue, &screen, portMAX_DELAY);
         xSemaphoreTake(pictureBus, portMAX_DELAY);
+        if (RefreshTest::faulted()) {
+            if(screen.reader) Reader::displayed();
+            xSemaphoreGive(pictureBus);
+            continue;
+        }
         if (screen.reader) {
             if (Reader::render(canvas, screen.battery)) {
                 M5.Display.setEpdMode(epd_mode_t::epd_fastest);

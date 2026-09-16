@@ -5,6 +5,18 @@ compatibility, minor changes add features, patch changes fix or refine behaviour
 The current API and device screen use the same version. Release binaries are
 application images for the existing 16 MB partition layout.
 
+## 0.5.0
+
+- Opt-in `/refresh-test` lab for one-shot accelerated **full-screen** refresh.
+- Normal chart must complete before experimental PLL timing is selectable;
+  acknowledgement and adequate measured power are required.
+- Compare normal 0x08 and experimental 0x07 clock settings, with measured total
+  and refresh BUSY times. Normal clock is written back after completion.
+- Isolated test waits for actual BUSY completion with 120-second timeouts. Failure
+  latches a display fault; no further display commands are allowed until restart.
+- Normal reader/gallery behaviour remains unchanged. No partial-refresh claim,
+  persistent fast-mode setting, waveform interruption or OTP/voltage changes.
+
 ## 0.4.0
 
 - TXT book import, normalization preview, SD library and prepared-text download.

@@ -4,6 +4,7 @@
 #include "feedback.h"
 #include "version.h"
 #include "ota_power.h"
+#include "refresh_test.h"
 #include <M5Unified.h>
 #include <WiFi.h>
 #include <Update.h>
@@ -79,6 +80,7 @@ void deviceTick(){
 }
 
 void deviceRoutes(WebServer& s,const String& token){
+    RefreshTest::routes(s,token);
     s.on("/device",HTTP_GET,[&s,&token]{String page(DEVICE_HTML);page.replace("{{TOKEN}}",token);s.sendHeader("Cache-Control","no-store");s.sendHeader("Content-Security-Policy","default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'");s.send(200,"text/html",page);});
     s.on("/device.js",HTTP_GET,[&s]{s.send_P(200,"text/javascript",DEVICE_JS);});
     s.on("/api/device",HTTP_GET,[&s]{

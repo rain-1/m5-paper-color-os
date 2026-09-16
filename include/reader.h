@@ -3,7 +3,7 @@
 #include <WebServer.h>
 
 namespace Reader {
-enum class Action { Menu, Previous, Next, Select, Open, Font, Jump, Bookmark, Recall, Sampler, Resume };
+enum class Action { Menu, Previous, Next, Select, Open, Font, Jump, Bookmark, Recall, Sampler, Resume, TestNormal, TestAccelerated };
 void begin(void (*schedule)());
 bool request(Action action, const char* id="", uint32_t value=0);
 bool active();

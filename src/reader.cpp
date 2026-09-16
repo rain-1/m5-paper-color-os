@@ -5,6 +5,7 @@
 #include "feedback.h"
 #include "version.h"
 #include "reader_page.h"
+#include "refresh_test.h"
 #include <SD.h>
 #include <Preferences.h>
 #include <WiFi.h>
@@ -162,7 +163,7 @@ bool busy(){return stateMutex && state().busy;}
 void leave(){if(!stateMutex)return;xSemaphoreTake(stateMutex,portMAX_DELAY);snapshot.active=false;xSemaphoreGive(stateMutex);}
 void resumeLast(){if(!lastId.isEmpty())request(Action::Resume);}
 bool request(Action action,const char* id,uint32_t value){
-    if(!stateMutex||!scheduleScreen)return false;
+    if(!stateMutex||!scheduleScreen||RefreshTest::faulted())return false;
     xSemaphoreTake(stateMutex,portMAX_DELAY);
     if(snapshot.busy){xSemaphoreGive(stateMutex);return false;}
     pending={action,{},value,snapshot.active};snapshot.busy=true;snapshot.active=true;strlcpy(pending.id,id,sizeof(pending.id));
@@ -180,6 +181,9 @@ bool render(M5Canvas& canvas,int battery){
     };
     auto recall=[&]{if(progress.bookmark==UINT32_MAX||pages.empty())message="No bookmark in this book yet.";else{pageIndex=BookLayout::pageAt(pages,progress.bookmark);view=View::Reading;}};
     switch(cmd.action){
+        case Action::TestNormal:case Action::TestAccelerated:
+            view=View::Info;selection=0;publish();
+            RefreshTest::run(canvas,cmd.action==Action::TestAccelerated);return false;
         case Action::Menu:view=View::Menu;selection=0;break;
         case Action::Resume:if(!currentId.isEmpty()&&!pages.empty())view=View::Reading;else if(!loadBook(lastId,canvas))view=View::Menu;break;
         case Action::Open:if(!loadBook(cmd.id,canvas))view=View::Menu;break;
@@ -281,6 +285,7 @@ void routes(WebServer& server,const String& token){
     server.on("/api/reader/action",HTTP_POST,[&server,&token]{
         auto reject=[&](int code,const char* text){server.send(code,"application/json",String("{\"error\":\"")+text+"\"}");};
         if(server.header("X-Paper-Token")!=token){reject(403,"Reload the page.");return;}
+        if(RefreshTest::faulted()){reject(409,"Display fault latched. Restart required before further display commands.");return;}
         String action=server.arg("action"),id=server.arg("id"),value=server.arg("value");
         Action cmd;uint32_t number=0;
         if(action=="open"){if(!BookLayout::validId(id.c_str())){reject(400,"Invalid book ID.");return;}cmd=Action::Open;}

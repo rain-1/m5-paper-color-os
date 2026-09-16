@@ -79,6 +79,10 @@ The first reader normalizes Latin text to ASCII and has a 1 MiB prepared-book li
 Page turns still require the colour panel's full refresh; fast partial refresh and
 deep-sleep battery optimisation are not implemented.
 
+Firmware 0.5.0 adds an opt-in `/refresh-test` comparison lab for experimental
+accelerated **full-screen** refresh. It does not enable fast timing in normal
+reading or pictures. See the [experiment instructions and limits](docs/partial-refresh-investigation.md).
+
 The image converter accepts JPEG/PNG, up to 12 MiB, 24 million pixels, and 12,000
 pixels on either side. It checks dimensions before decoding, fits the entire image
 to 400×600 with white borders, and offers solid colour quantization or

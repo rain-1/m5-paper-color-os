@@ -81,3 +81,15 @@ so the current `M5.Led` calls silently fail. The lab endpoint does not check tha
 failure and incorrectly returns success. Firmware 0.4.0 does **not** fix this;
 it needs a compatible LED backend and truthful test status before LED feedback
 can be considered implemented on hardware. Audible cues remain independent.
+
+## 0.5.0 accelerated full-refresh experiment — pending installation
+
+- Firmware build passed. Native palette tests passed for RGB565 inputs and all
+  65,536 possible input values; existing converter/import tests passed.
+- Chromium test of the embedded experiment page with mocked HTTP passed:
+  baseline/acknowledgement requirements, one-shot requests, busy/fault controls,
+  timing display and mobile layout. This is not a hardware timing test.
+- Source review checked the display bus's D/C polarity, canvas RGB565 reads,
+  full-frame byte count, normal power sequence, BUSY waits and default-clock write.
+- The installed device remains 0.4.0. No experimental register write or refresh
+  has been performed. Speed, image quality and restoration still need live tests.

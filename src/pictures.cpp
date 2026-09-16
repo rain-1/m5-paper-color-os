@@ -4,6 +4,7 @@
 #include "device.h"
 #include "feedback.h"
 #include "reader.h"
+#include "refresh_test.h"
 #include "book_storage.h"
 #include <SD.h>
 #include <SPI.h>
@@ -103,6 +104,7 @@ void picturesRoutes(WebServer& s, void (*display)(const char*)) {
     });
     s.on("/api/display", HTTP_POST, [&s,display] {
         if (!authorized(s)) { error(s,403,"Reload the page before trying again."); return; }
+        if (RefreshTest::faulted()) { error(s,409,"Display fault latched. Restart required."); return; }
         if (Reader::busy()) { error(s,409,"Reader is refreshing. Please wait."); return; }
         String path=s.arg("path");
         if (!picture::path(path.c_str())) { error(s,400,"Invalid picture path."); return; }

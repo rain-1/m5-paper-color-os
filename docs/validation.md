@@ -82,7 +82,7 @@ failure and incorrectly returns success. Firmware 0.4.0 does **not** fix this;
 it needs a compatible LED backend and truthful test status before LED feedback
 can be considered implemented on hardware. Audible cues remain independent.
 
-## 0.5.0 accelerated full-refresh experiment — pending installation
+## 0.5.0 accelerated full-refresh experiment — normal baseline established
 
 - Firmware build passed. Native palette tests passed for RGB565 inputs and all
   65,536 possible input values; existing converter/import tests passed.
@@ -91,5 +91,10 @@ can be considered implemented on hardware. Audible cues remain independent.
   timing display and mobile layout. This is not a hardware timing test.
 - Source review checked the display bus's D/C polarity, canvas RGB565 reads,
   full-frame byte count, normal power sequence, BUSY waits and default-clock write.
-- The installed device remains 0.4.0. No experimental register write or refresh
-  has been performed. Speed, image quality and restoration still need live tests.
+- Installed 0.5.0 over OTA after physical unlock; saved Wi-Fi reconnected, reader
+  place/bookmark restored and OTA relocked. USB input was 4,746 mV.
+- One normal-clock comparison chart completed: 35,368 ms total, 33,800 ms refresh
+  BUSY interval. No fault was latched; default-clock restoration write completed.
+- No accelerated refresh has yet been triggered. The normal chart is left on
+  screen for the user's visual baseline. Experimental speed, image quality and
+  restoration after accelerated operation remain unverified.

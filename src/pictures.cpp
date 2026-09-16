@@ -115,7 +115,22 @@ void picturesRoutes(WebServer& s, void (*display)(const char*)) {
         display(path.c_str());
         json(s,202,"{\"queued\":true}");
     });
-    s.on("/api/upload", HTTP_POST, [&s] {
+    s.on("/api/thumbnail",HTTP_GET,[&s]{
+        String path=s.arg("path");
+        if(!picture::path(path.c_str())){error(s,400,"Invalid picture path.");return;}
+        Lock lock;if(!lock.held){error(s,409,"Screen is refreshing. Reload previews when it finishes.");return;}
+        if(!mounted){error(s,503,"SD card is not mounted.");return;}
+        File file=SD.open(path);if(!file){error(s,404,"Picture not found.");return;}
+        if(file.size()!=picture::fileSize){error(s,422,"Invalid picture file.");return;}
+        auto source=static_cast<uint8_t*>(ps_malloc(picture::fileSize));
+        auto thumb=static_cast<uint8_t*>(ps_malloc(picture::thumbSize));
+        if(!source||!thumb){free(source);free(thumb);error(s,503,"Not enough memory for preview.");return;}
+        bool ok=file.read(source,picture::fileSize)==picture::fileSize&&picture::valid(source,picture::fileSize);file.close();
+        if(ok){picture::thumbnail(source,thumb);s.sendHeader("Cache-Control","private, max-age=86400");s.send_P(200,"application/octet-stream",reinterpret_cast<const char*>(thumb),picture::thumbSize);}
+        else error(s,422,"Invalid picture file.");
+        free(source);free(thumb);
+    });
+    s.on("/api/upload", HTTP_POST, [&s,display] {
         if (!authorized(s)) { resetUpload(); error(s,403,"Reload the page before trying again."); return; }
         if (!completed || !uploadBytes || !uploadError.isEmpty() || !picture::valid(uploadBytes,received)) {
             resetUpload(); error(s,400,"Upload rejected: expected one valid 400 x 600 Paper OS image."); return;
@@ -153,7 +168,9 @@ void picturesRoutes(WebServer& s, void (*display)(const char*)) {
         if (!ok) { error(s,507,"SD write verification failed. Check card space and try again."); return; }
         Serial.printf("Picture saved: %s\n",path.c_str());
         Feedback::play(Feedback::Cue::Saved);
-        json(s,201,"{\"path\":\""+path+"\"}");
+        bool queued=!Reader::busy()&&!RefreshTest::faulted();
+        if(queued)display(path.c_str());
+        json(s,201,"{\"path\":\""+path+"\",\"displayQueued\":"+(queued?"true":"false")+"}");
     }, [&s] {
         // Arduino invokes this callback for raw bodies too, without HTTPUpload.
         if (!s.header("Content-Type").startsWith("multipart/")) {

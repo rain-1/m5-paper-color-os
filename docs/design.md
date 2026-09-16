@@ -47,7 +47,7 @@ navigation into one pending display request.
   independent of removable storage. Add versioned settings before more preferences.
 - Picture storage: SD owns prepared images. Browser owns original decode, fit,
   palette quantization and dithering. The device validates and renders a fixed
-  pixel format. Add pagination, thumbnails and indexing for large collections.
+  pixel format and serves small lazy thumbnails. Add pagination and indexing for large collections.
 - Display: one worker owns graphics. Serialize SD access with display SPI use.
   Network handlers should return promptly with a queued/busy result.
 - Hardware services: main task owns buttons and I2C telemetry; tests have bounded
@@ -62,8 +62,8 @@ navigation into one pending display request.
 
 ## Next milestones
 
-1. Evaluate palette and dithering on the real panel; support crop/rotate and
-   browser thumbnails. Add last-picture restoration and button navigation.
+1. Evaluate palette and perceptual dithering on the real panel; add crop controls
+   beyond the existing landscape rotation. Add last-picture restoration and button navigation.
 2. Add explicit microphone metering, RTC time setting, IR test codes, and a Grove
    accessory page. Keep unsupported controls clearly labelled.
 3. Measure battery use; implement timed sleep, wake scheduling and gallery mode.

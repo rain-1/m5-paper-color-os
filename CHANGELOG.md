@@ -5,6 +5,16 @@ compatibility, minor changes add features, patch changes fix or refine behaviour
 The current API and device screen use the same version. Release binaries are
 application images for the existing 16 MB partition layout.
 
+## 0.8.0
+
+- Perceptual OKLab nearest-colour matching and error diffusion in the browser,
+  with optional saturation and lightness contrast adjustments and neutral reset.
+  Original RGB mode remains available for comparison; panel palette is uncalibrated.
+- Lazy 80×120 previews beside gallery Display buttons, including legacy pictures.
+- Save to SD now queues the verified picture for display; if blocked/busy, the
+  response clearly distinguishes successful storage from a skipped display.
+- No panel timing changes. Host-tested; physical installation remains pending.
+
 ## 0.7.0
 
 - Picture uploader Landscape checkbox rotates pixels 90° clockwise before

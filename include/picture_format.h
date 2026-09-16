@@ -8,6 +8,17 @@ namespace picture {
 constexpr size_t width = 400, height = 600, headerSize = 16;
 constexpr size_t fileSize = headerSize + width * height / 2;
 constexpr uint8_t header[headerSize] = {'P','6','I','1',0x90,1,0x58,2,0,0,0,0,0,0,0,0};
+constexpr size_t thumbWidth=80,thumbHeight=120,thumbSize=headerSize+thumbWidth*thumbHeight/2;
+// Caller validates source. Sample centres of 5x5 blocks in the stored orientation.
+inline void thumbnail(const uint8_t* source,uint8_t* target){
+    const uint8_t h[16]={'P','6','T','1',80,0,120,0,0,0,0,0,0,0,0,0};
+    memcpy(target,h,16);memset(target+16,0,thumbSize-16);
+    for(size_t y=0;y<thumbHeight;++y)for(size_t x=0;x<thumbWidth;++x){
+        size_t i=(y*5+2)*width+x*5+2,j=y*thumbWidth+x;
+        uint8_t b=source[16+i/2],c=(i&1)?b&15:b>>4;
+        target[16+j/2]|=c<<((j&1)?0:4);
+    }
+}
 // Palette indices: black, white, yellow, red, blue, green. High nibble first.
 inline bool valid(const uint8_t* bytes, size_t size) {
     if (!bytes || size != fileSize || memcmp(bytes, header, headerSize)) return false;

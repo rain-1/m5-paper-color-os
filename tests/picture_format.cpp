@@ -25,4 +25,11 @@ int main(){
     for(auto s:{"", "ll", "L", "../"})assert(!picture::orientation(s));
     assert(!picture::path("/pictures/2026/08/20260916_143025_deadbeef.p6"));
     assert(!picture::path("/pictures/../../secret"));
+    memcpy(image.data(),picture::header,picture::headerSize);
+    for(size_t i=0;i<picture::width*picture::height;i+=2)image[16+i/2]=((i%6)<<4)|((i+1)%6);
+    assert(picture::valid(image.data(),image.size()));
+    std::vector<uint8_t> thumb(picture::thumbSize);
+    picture::thumbnail(image.data(),thumb.data());
+    assert(thumb.size()==4816 && !memcmp(thumb.data(),"P6T1",4) && thumb[4]==80 && thumb[6]==120);
+    for(size_t y=0;y<120;++y)for(size_t x=0;x<80;++x){size_t i=y*80+x;auto c=(i&1)?thumb[16+i/2]&15:thumb[16+i/2]>>4;assert(c==((y*5+2)*400+x*5+2)%6);}
 }

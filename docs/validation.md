@@ -120,6 +120,17 @@ can be considered implemented on hardware. Audible cues remain independent.
 - Accelerated transitions between the new full-page patterns await user testing;
   no claim of visual quality is made from timing/status telemetry alone.
 
+## 0.8.0 gallery and colour treatment — host verified, pending installation
+
+- Firmware build passed (1,152,237-byte application). No device write or refresh.
+- Converter tests cover OKLab reference colours, neutral/saturation/lightness
+  controls, deterministic six-colour packing, dithering and preview parity.
+- Real Chromium with mocked routes verifies controls/reset/RGB comparison,
+  preserved white borders, rotation, lazy thumbnails, new-upload local previews,
+  queued versus saved-but-not-displayed feedback, retry buttons and mobile layout.
+- Sanitized C++ tests verify every thumbnail sample and existing file validation.
+- Hardware SD/display integration and physical colour quality remain unverified.
+
 ## 0.7.0 landscape uploads — host verified, pending installation
 
 - Firmware build and existing converter tests passed. Sanitized C++ picture

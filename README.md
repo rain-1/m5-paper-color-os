@@ -86,7 +86,12 @@ reading or pictures. See the [experiment instructions and limits](docs/partial-r
 The image converter accepts JPEG/PNG, up to 12 MiB, 24 million pixels, and 12,000
 pixels on either side. It checks dimensions before decoding, fits the entire image
 to 400×600 with white borders, and offers solid colour quantization or
-Floyd–Steinberg dithering. Conversion happens in your browser. Only the packed
+Floyd–Steinberg dithering. Perceptual mode uses OKLab for nearest-colour matching
+and error diffusion, with saturation (0–200%) and contrast (50–200%) controls;
+100% is neutral. Contrast adjusts lightness while preserving black/white endpoints.
+Original RGB mode remains available for comparison (adjustments disabled).
+The nominal six-colour palette is not measured/calibrated to the physical panel;
+stronger treatment cannot diagnose or fix hardware issues. Conversion happens in your browser. Only the packed
 120,016-byte file is uploaded. Dates use the browser's local time:
 `/pictures/YYYY/MM/YYYYMMDD_HHMMSS_p_randomhex.p6` (portrait) or
 `YYYYMMDD_HHMMSS_l_randomhex.p6` (landscape). The **Landscape** checkbox rotates
@@ -97,6 +102,15 @@ upload `orientation` parameter default to `p`. Files are verified by readback
 before renaming a temporary file. Interrupted writes may leave `.tmp` files,
 which are not shown in the gallery. The gallery lists up to 100 files per month.
 Existing files are never overwritten. Originals are not stored.
+
+**Save to SD & display** queues the verified image using normal refresh timing.
+If the reader is busy or display is fault-blocked, storage still succeeds and the
+page tells you to use Display later. Each gallery button has a lazy 80×120 preview
+served by `/api/thumbnail?path=…` (4,816 bytes: `P6T1` header and packed pixels).
+If the shared SD/display bus is busy, reload the month after the refresh to retry
+missing previews. Newly saved pictures use an immediate local preview.
+
+OKLab conversion uses [Björn Ottosson's published matrices](https://bottosson.github.io/posts/oklab/).
 
 The `.p6` format is a 16-byte header followed by two palette indices per byte,
 high nibble first, in row order. Header: ASCII `P6I1`, little-endian uint16 width

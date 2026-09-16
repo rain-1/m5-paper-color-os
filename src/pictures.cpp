@@ -15,6 +15,9 @@ namespace {
 bool mounted = false;
 String sessionToken;
 uint8_t* uploadBytes = nullptr;
+// Protected by pictureBus; never persisted. A superseded request retains at
+// most one image until the next temporary upload or restart.
+uint8_t* temporaryBytes = nullptr;
 size_t received = 0;
 bool completed = false;
 String uploadError;
@@ -137,6 +140,14 @@ void picturesRoutes(WebServer& s, void (*display)(const char*)) {
         }
         Lock lock;
         if (!lock.held) { resetUpload(); error(s,409,"Screen is refreshing. Try uploading again in 30 seconds."); return; }
+        if(s.arg("target")=="display") {
+            if(Reader::busy()||RefreshTest::faulted()){resetUpload();error(s,409,"Display busy or fault-blocked. Try again when ready.");return;}
+            free(temporaryBytes);temporaryBytes=uploadBytes;uploadBytes=nullptr;
+            resetUpload();
+            display(":memory:");
+            json(s,202,"{\"displayQueued\":true,\"saved\":false}");
+            return;
+        }
         if (!mounted) { resetUpload(); error(s,503,"SD card is not mounted."); return; }
         String year="/pictures/"+uploadDate.substring(0,4);
         String month=year+"/"+uploadDate.substring(4,6);
@@ -188,7 +199,9 @@ void picturesRoutes(WebServer& s, void (*display)(const char*)) {
             resetUpload(); uploadError=""; uploadDate=s.arg("date");
             String orientation=s.hasArg("orientation")?s.arg("orientation"):"p";
             uploadOrientation=orientation.length()?orientation[0]:'p';
-            if (duplicate || !authorized(s) || !mounted || !picture::date(uploadDate.c_str()) || !picture::orientation(orientation.c_str())) uploadError="Rejected";
+            String target=s.hasArg("target")?s.arg("target"):"save";
+            bool destinationOk=target=="display"||(target=="save"&&mounted&&picture::date(uploadDate.c_str()));
+            if (duplicate || !authorized(s) || !destinationOk || !picture::orientation(orientation.c_str())) uploadError="Rejected";
             else uploadBytes=static_cast<uint8_t*>(ps_malloc(picture::fileSize));
             if (!uploadBytes) uploadError="Rejected";
         } else if (u.status==UPLOAD_FILE_WRITE && uploadBytes && uploadError.isEmpty()) {
@@ -201,13 +214,20 @@ void picturesRoutes(WebServer& s, void (*display)(const char*)) {
 }
 
 bool picturesDraw(M5Canvas& canvas, const char* path) {
-    if (!mounted || !picture::path(path)) return false;
-    File file=SD.open(path);
-    if (!file || file.size()!=picture::fileSize) return false;
-    uint8_t* bytes=static_cast<uint8_t*>(ps_malloc(picture::fileSize));
-    if (!bytes) return false;
-    bool ok=file.read(bytes,picture::fileSize)==picture::fileSize && picture::valid(bytes,picture::fileSize);
-    file.close();
+    uint8_t* bytes=nullptr;
+    bool ok=false;
+    if(!strcmp(path,":memory:")) {
+        bytes=temporaryBytes;temporaryBytes=nullptr;
+        ok=picture::valid(bytes,picture::fileSize);
+    } else {
+        if (!mounted || !picture::path(path)) return false;
+        File file=SD.open(path);
+        if (!file || file.size()!=picture::fileSize) return false;
+        bytes=static_cast<uint8_t*>(ps_malloc(picture::fileSize));
+        if (!bytes) return false;
+        ok=file.read(bytes,picture::fileSize)==picture::fileSize && picture::valid(bytes,picture::fileSize);
+        file.close();
+    }
     if (ok) {
         const uint16_t colors[]={BLACK,WHITE,YELLOW,RED,BLUE,GREEN};
         for (size_t i=0;i<picture::width*picture::height;++i) {

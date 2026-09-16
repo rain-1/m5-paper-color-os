@@ -104,6 +104,12 @@ which are not shown in the gallery. The gallery lists up to 100 files per month.
 Existing files are never overwritten. Originals are not stored.
 
 **Save to SD & display** queues the verified image using normal refresh timing.
+**Display only · don't save** instead uploads to temporary RAM, with no SD writes
+or gallery entry, and works without a card. RAM is released after drawing; if a
+queued request is superseded, at most one image remains until another temporary
+upload or restart. The physical e-paper image can remain visible without power,
+but there is no saved file to reopen. `/api/upload?target=display` accepts the
+same validated multipart `.p6`; `target=save` (default) retains the saved workflow.
 If the reader is busy or display is fault-blocked, storage still succeeds and the
 page tells you to use Display later. Each gallery button has a lazy 80×120 preview
 served by `/api/thumbnail?path=…` (4,816 bytes: `P6T1` header and packed pixels).

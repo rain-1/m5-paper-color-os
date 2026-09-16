@@ -120,7 +120,20 @@ can be considered implemented on hardware. Audible cues remain independent.
 - Accelerated transitions between the new full-page patterns await user testing;
   no claim of visual quality is made from timing/status telemetry alone.
 
-## 0.8.0 gallery and colour treatment — host verified, pending installation
+## 0.9.0 temporary display — host verified, pending installation
+
+- Firmware build passed (1,153,561-byte application); converter tests pass.
+- Chromium mocked-device tests verify Display only sends the exact prepared
+  bytes with `target=display`, adds no gallery entry, reports no SD save, and
+  remains usable after reload with a missing card. Existing save tests pass.
+- Reviewed backend branch: validated upload transfers RAM ownership under the
+  display mutex and returns before all SD operations. Draw consumes/frees RAM.
+- No physical display-only request or firmware installation performed yet.
+
+## 0.8.0 gallery and colour treatment — installed
+
+- OTA accepted after physical unlock; live API confirmed version 0.8.0, Wi-Fi
+  reconnection and `otaSeconds: 0`. No experimental refresh triggered.
 
 - Firmware build passed (1,152,237-byte application). No device write or refresh.
 - Converter tests cover OKLab reference colours, neutral/saturation/lightness

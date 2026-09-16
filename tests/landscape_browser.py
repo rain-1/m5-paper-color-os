@@ -13,12 +13,14 @@ html=source.split('R"HTML(')[1].split(')HTML"')[0].replace('{{TOKEN}}','abc123')
 script=source.split('R"JS(')[1].split(')JS"')[0]
 uploads=[]
 display_queued=True
+card_mounted=True
+temporary_uploads=[]
 thumb=bytes([80,54,84,49,80,0,120,0,0,0,0,0,0,0,0,0])+bytes([0x34])*4800
 def serve(route):
     req=route.request;url=urlparse(req.url)
     if url.path=='/gallery':route.fulfill(body=html,content_type='text/html')
     elif url.path=='/converter.js':route.fulfill(body=script,content_type='text/javascript')
-    elif url.path=='/api/card':route.fulfill(json=dict(mounted=True))
+    elif url.path=='/api/card':route.fulfill(json=dict(mounted=card_mounted))
     elif url.path=='/api/images':route.fulfill(json=dict(files=['/pictures/2026/09/20260916_143025_deadbeef.p6']))
     elif url.path=='/api/thumbnail':route.fulfill(body=thumb,content_type='application/octet-stream')
     elif url.path=='/api/display':route.fulfill(status=202,json=dict(queued=True))
@@ -26,6 +28,10 @@ def serve(route):
         assert req.headers['x-paper-token']=='abc123'
         marker=parse_qs(url.query)['orientation'][0]
         packed=req.post_data_buffer.split(b'\r\n\r\n',1)[1].rsplit(b'\r\n--',1)[0]
+        if parse_qs(url.query).get('target')==['display']:
+            temporary_uploads.append(packed)
+            route.fulfill(status=202,json=dict(displayQueued=True,saved=False))
+            return
         uploads.append((marker,packed))
         route.fulfill(status=201,json=dict(path=f'/pictures/2026/09/20260916_143025_{marker}_deadbeef.p6',displayQueued=display_queued))
     else:route.fulfill(status=404)
@@ -85,6 +91,20 @@ with sync_playwright() as p:
     assert page.locator('#files button').count()==3 # new rows plus legacy path
     page.locator('#files li').first.locator('button').click()
     page.wait_for_function("document.getElementById('message').textContent.includes('Picture queued')")
+    page.locator('#displayOnly').click()
+    page.wait_for_function("document.getElementById('message').textContent.includes('Not saved to SD')")
+    assert temporary_uploads[-1]==uploads[-1][1]
+    assert page.locator('#files button').count()==3
+    card_mounted=False
+    page.reload(wait_until='networkidle')
+    assert 'Display only still works' in page.locator('#card').inner_text()
+    assert page.locator('#displayOnly').is_disabled()
+    page.locator('#file').set_input_files(dict(name='wide.png',mimeType='image/png',buffer=base64.b64decode(png)))
+    page.wait_for_function("!document.getElementById('displayOnly').disabled")
+    page.locator('#displayOnly').click()
+    page.wait_for_function("document.getElementById('message').textContent.includes('Not saved to SD')")
+    assert len(temporary_uploads)==2 and len(temporary_uploads[-1])==120016
+    assert page.locator('#files li').count()==0
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), page.evaluate("Array.from(document.querySelectorAll('*')).filter(e=>e.getBoundingClientRect().right>innerWidth).map(e=>[e.tagName,e.id,e.getBoundingClientRect().right])")
     assert not errors,errors
     browser.close()

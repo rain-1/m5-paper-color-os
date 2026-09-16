@@ -15,7 +15,8 @@ button{background:#195d3b;color:white;border:0;border-radius:6px;cursor:pointer;
 <label>Dithering <select id="dither"><option value="yes">Floyd–Steinberg dithering</option><option value="no">Solid six colours</option></select></label>
 <label><input id="landscape" type="checkbox"> Landscape · rotate 90° clockwise</label>
 <canvas id="preview" width="400" height="600"></canvas><small>Fits the whole image with white borders. Preview colours are approximate.</small><br>
-<button id="upload" disabled>Save to SD &amp; display</button><p id="message" role="status" aria-live="polite"></p></section>
+<button id="displayOnly" disabled>Display only · don't save</button>
+<button id="upload" disabled>Save to SD &amp; display</button><br><small>Display only uses temporary memory, works without an SD card, and does not add a gallery entry.</small><p id="message" role="status" aria-live="polite"></p></section>
 <section><h2>Your pictures</h2><input id="month" type="month"><button id="refresh">Load month</button><p>Showing up to 100 files per month. Select a picture to display it.</p><ul id="files"></ul></section></main><script src="/converter.js"></script></html>)HTML";
 
 constexpr char CONVERTER_JS[] = R"JS(
@@ -139,7 +140,7 @@ if(typeof document!=='undefined') {
     const data=await response.json(); if(!response.ok)throw Error(data.error||'Request failed'); return data;
   }
   function convert() {
-    converted=null;$('upload').disabled=true;
+    converted=null;$('upload').disabled=$('displayOnly').disabled=true;
     if(!image)return;
     const landscape=$('landscape').checked;
     ctx.fillStyle='white';ctx.fillRect(0,0,400,600);
@@ -150,11 +151,11 @@ if(typeof document!=='undefined') {
     const pixels=ctx.getImageData(0,0,400,600);
     converted=quantize(pixels.data,400,600,$('dither').value==='yes',{matching:$('matching').value,saturation:Number($('saturation').value)/100,contrast:Number($('contrast').value)/100});
     convertedOrientation=landscape?'l':'p';
-    ctx.putImageData(pixels,0,0);$('upload').disabled=uploading;
+    ctx.putImageData(pixels,0,0);$('upload').disabled=$('displayOnly').disabled=uploading;
     say('Ready ('+(landscape?'landscape, rotated clockwise':'portrait')+'). Only the converted 120 KB picture will be uploaded. Filename marker: '+convertedOrientation+'.');
   }
   $('file').onchange=async()=>{
-    const revision=++generation;converted=null;image=null;$('upload').disabled=true;
+    const revision=++generation;converted=null;image=null;$('upload').disabled=$('displayOnly').disabled=true;
     try {
       const file=$('file').files[0];if(!file)return;
       if(file.size>12*1024*1024)throw Error('Choose an image smaller than 12 MB.');
@@ -191,25 +192,28 @@ if(typeof document!=='undefined') {
       if(!data.files.length)$('files').textContent='No pictures in this month yet.';
     }catch(e){say(e.message);}
   }
-  $('upload').onclick=async()=>{
-    if(!converted||uploading)return;uploading=true;$('upload').disabled=true;
+  async function upload(displayOnly=false){
+    if(!converted||uploading)return;uploading=true;$('upload').disabled=$('displayOnly').disabled=true;
     try {
       const now=new Date(),pad=n=>String(n).padStart(2,'0');
       const date=`${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
       const body=new FormData();body.append('image',new Blob([converted],{type:'application/octet-stream'}),'picture.p6');
       const savedPreview=document.createElement('canvas');savedPreview.width=400;savedPreview.height=600;savedPreview.getContext('2d').drawImage($('preview'),0,0);
-      say('Saving and checking the SD card…');
-      const data=await request('/api/upload?date='+date+'&orientation='+convertedOrientation,{method:'POST',body});
+      say(displayOnly?'Sending to temporary memory…':'Saving and checking the SD card…');
+      const data=await request('/api/upload?date='+date+'&orientation='+convertedOrientation+'&target='+(displayOnly?'display':'save'),{method:'POST',body});
+      if(displayOnly){say('Display queued. Not saved to SD; no gallery entry. Allow time for the normal screen refresh.');return;}
       ++listGeneration;const month=`${now.getFullYear()}-${pad(now.getMonth()+1)}`;
       if($('month').value!==month||!$('files').querySelector('li')){$('files').replaceChildren();observer.disconnect();thumbQueue=[];}
       $('month').value=month;
       for(const row of $('files').querySelectorAll('li'))if(row.dataset.path===data.path)row.remove();
       $('files').prepend(pictureRow(data.path,savedPreview));
       say('Saved '+data.path+(data.displayQueued?'. Display queued; allow time for the screen to refresh.':'. Saved, but NOT displayed: the reader is busy or display is blocked. Use its Display button when ready; no need to upload again.'));
-    }catch(e){say(e.message);}finally{uploading=false;$('upload').disabled=!converted;}
-  };
+    }catch(e){say(e.message);}finally{uploading=false;$('upload').disabled=$('displayOnly').disabled=!converted;}
+  }
+  $('upload').onclick=()=>upload(false);
+  $('displayOnly').onclick=()=>upload(true);
   const now=new Date();$('month').value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   $('refresh').onclick=list;
-  request('/api/card').then(data=>{$('card').textContent=data.mounted?'SD card ready.':'SD card not mounted. Insert a FAT32 card and restart.';if(data.mounted)list();}).catch(e=>say(e.message));
+  request('/api/card').then(data=>{$('card').textContent=data.mounted?'SD card ready.':'No SD card. Display only still works; saving requires a FAT32 card and restart.';if(data.mounted)list();}).catch(e=>say(e.message));
 }
 )JS";

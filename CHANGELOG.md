@@ -5,6 +5,12 @@ compatibility, minor changes add features, patch changes fix or refine behaviour
 The current API and device screen use the same version. Release binaries are
 application images for the existing 16 MB partition layout.
 
+## 0.9.0
+
+- Separate Display only action uploads to temporary RAM without any SD writes,
+  filename or gallery entry; works with no card mounted. Normal refresh only.
+- The same token, size/header/palette validation and busy/fault guards apply.
+
 ## 0.8.0
 
 - Perceptual OKLab nearest-colour matching and error diffusion in the browser,

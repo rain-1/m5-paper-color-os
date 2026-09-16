@@ -5,6 +5,16 @@ compatibility, minor changes add features, patch changes fix or refine behaviour
 The current API and device screen use the same version. Release binaries are
 application images for the existing 16 MB partition layout.
 
+## 0.6.0
+
+- Full-page refresh experiments: serif/sans text, inverse text, checkerboards,
+  six-colour blocks and white cleanup, with alternate text/pattern variants.
+- Last eight completed test timings retained in RAM with pattern and mode labels.
+- Removed confusing A/B test labels; physical buttons remain reader controls.
+- Clarified that USB power is recommended, not mandatory with adequate battery.
+- Accelerated timing remains opt-in, one refresh per request, with default-clock
+  restoration and the existing fault/power guards unchanged.
+
 ## 0.5.0
 
 - Opt-in `/refresh-test` lab for one-shot accelerated **full-screen** refresh.

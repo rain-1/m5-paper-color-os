@@ -95,6 +95,18 @@ can be considered implemented on hardware. Audible cues remain independent.
   place/bookmark restored and OTA relocked. USB input was 4,746 mV.
 - One normal-clock comparison chart completed: 35,368 ms total, 33,800 ms refresh
   BUSY interval. No fault was latched; default-clock restoration write completed.
-- No accelerated refresh has yet been triggered. The normal chart is left on
-  screen for the user's visual baseline. Experimental speed, image quality and
-  restoration after accelerated operation remain unverified.
+- User-triggered accelerated chart completed: 18,627 ms total and 16,960 ms BUSY,
+  versus 35,368 ms total at normal timing (about 47% less elapsed time).
+  Telemetry reported no fault and the default-clock restoration write completed.
+  The user reports that image quality looked fine. This is a single chart, not
+  a long-term reliability or temperature-range validation.
+
+## 0.6.0 expanded refresh tests — pending installation
+
+- Build, native palette/pattern bounds tests, and mocked Chromium UI checks pass.
+- UI tests cover pattern/variant payloads, timing history, busy selection locks,
+  baseline requirement, acknowledgement and fault handling.
+- Added full-page serif/sans/inverse text, checkerboards, colour blocks, white
+  cleanup and alternate variants. No new hardware timing or voltage setting;
+  the same measured PLL 0x07 experiment remains one-shot and off by default.
+- The device still runs 0.5.0. New patterns have not yet been tested on hardware.

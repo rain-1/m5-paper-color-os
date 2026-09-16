@@ -183,7 +183,7 @@ bool render(M5Canvas& canvas,int battery){
     switch(cmd.action){
         case Action::TestNormal:case Action::TestAccelerated:
             view=View::Info;selection=0;publish();
-            RefreshTest::run(canvas,cmd.action==Action::TestAccelerated);return false;
+            RefreshTest::run(canvas,cmd.action==Action::TestAccelerated,cmd.value);return false;
         case Action::Menu:view=View::Menu;selection=0;break;
         case Action::Resume:if(!currentId.isEmpty()&&!pages.empty())view=View::Reading;else if(!loadBook(lastId,canvas))view=View::Menu;break;
         case Action::Open:if(!loadBook(cmd.id,canvas))view=View::Menu;break;

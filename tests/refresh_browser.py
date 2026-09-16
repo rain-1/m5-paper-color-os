@@ -10,7 +10,7 @@ args=parser.parse_args()
 source=Path("include/refresh_test_page.h").read_text()
 html=source.split('R"HTML(')[1].split(')HTML"')[0].replace("{{TOKEN}}","abc123")
 script=source.split('R"JS(')[1].split(')JS"')[0]
-state=dict(busy=False,faulted=False,restored=True,baselineMs=0,fastMs=0,busyMs=0,mode="none",message="Ready")
+state=dict(busy=False,faulted=False,restored=True,baselineMs=0,fastMs=0,busyMs=0,mode="none",message="Ready",pattern="chart",variant=1,history=[])
 posts=[]
 def serve(route):
     r=route.request
@@ -38,11 +38,14 @@ with sync_playwright() as p:
     assert posts[-1]['mode']==['normal']
     state.update(busy=False,baselineMs=25000,busyMs=24000,mode='normal',message='Complete')
     page.wait_for_function("!document.getElementById('fast').disabled")
+    page.select_option('#pattern','serif');page.select_option('#variant','2')
     page.locator('#fast').click()
     page.wait_for_function("document.getElementById('normal').disabled")
-    assert posts[-1]==dict(mode=['accelerated'],ack=['timing-experiment'])
-    state.update(busy=False,fastMs=10000,busyMs=9000,mode='accelerated')
+    assert posts[-1]==dict(mode=['accelerated'],ack=['timing-experiment'],pattern=['serif'],variant=['2'])
+    assert page.locator('#pattern').is_disabled()
+    state.update(busy=False,fastMs=10000,busyMs=9000,mode='accelerated',pattern='serif',variant=2,history=[dict(pattern='serif',variant=2,mode='accelerated',totalMs=10000,busyMs=9000)])
     page.wait_for_function("document.getElementById('state').textContent.includes('10.00 s')")
+    assert 'serif 2' in page.locator('#history').inner_text()
     page.locator('#ack').uncheck()
     assert page.locator('#fast').is_disabled()
     state.update(faulted=True,restored=False,message='Timeout')

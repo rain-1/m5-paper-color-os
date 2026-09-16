@@ -101,7 +101,7 @@ can be considered implemented on hardware. Audible cues remain independent.
   The user reports that image quality looked fine. This is a single chart, not
   a long-term reliability or temperature-range validation.
 
-## 0.6.0 expanded refresh tests — pending installation
+## 0.6.0 expanded refresh tests — deployed, normal serif baseline
 
 - Build, native palette/pattern bounds tests, and mocked Chromium UI checks pass.
 - UI tests cover pattern/variant payloads, timing history, busy selection locks,
@@ -109,4 +109,13 @@ can be considered implemented on hardware. Audible cues remain independent.
 - Added full-page serif/sans/inverse text, checkerboards, colour blocks, white
   cleanup and alternate variants. No new hardware timing or voltage setting;
   the same measured PLL 0x07 experiment remains one-shot and off by default.
-- The device still runs 0.5.0. New patterns have not yet been tested on hardware.
+- Installed 0.6.0 over OTA after physical unlock; confirmed version, Wi-Fi
+  reconnection and relocked OTA. Live API rejected invalid patterns/variants and
+  accelerated testing before the first completed normal reference.
+- Live Chromium passed seven-pattern/two-variant controls, state polling, script
+  checks and mobile layout without triggering additional refreshes.
+- Normal serif variant 1 completed in 35,412 ms total / 33,839 ms BUSY, no fault,
+  default-clock restoration reported. The timing history correctly identifies
+  pattern, variant and mode. This page is left displayed for visual comparison.
+- Accelerated transitions between the new full-page patterns await user testing;
+  no claim of visual quality is made from timing/status telemetry alone.

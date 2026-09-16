@@ -88,7 +88,12 @@ pixels on either side. It checks dimensions before decoding, fits the entire ima
 to 400×600 with white borders, and offers solid colour quantization or
 Floyd–Steinberg dithering. Conversion happens in your browser. Only the packed
 120,016-byte file is uploaded. Dates use the browser's local time:
-`/pictures/YYYY/MM/YYYYMMDD_HHMMSS_randomhex.p6`. Files are verified by readback
+`/pictures/YYYY/MM/YYYYMMDD_HHMMSS_p_randomhex.p6` (portrait) or
+`YYYYMMDD_HHMMSS_l_randomhex.p6` (landscape). The **Landscape** checkbox rotates
+the picture 90° clockwise before fitting and quantization; the preview shows the
+stored orientation. Both modes keep aspect ratio and use the same 400×600 format.
+Older filenames without a `p`/`l` marker remain supported. Clients omitting the
+upload `orientation` parameter default to `p`. Files are verified by readback
 before renaming a temporary file. Interrupted writes may leave `.tmp` files,
 which are not shown in the gallery. The gallery lists up to 100 files per month.
 Existing files are never overwritten. Originals are not stored.

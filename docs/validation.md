@@ -119,3 +119,15 @@ can be considered implemented on hardware. Audible cues remain independent.
   pattern, variant and mode. This page is left displayed for visual comparison.
 - Accelerated transitions between the new full-page patterns await user testing;
   no claim of visual quality is made from timing/status telemetry alone.
+
+## 0.7.0 landscape uploads — host verified, pending installation
+
+- Firmware build and existing converter tests passed. Sanitized C++ picture
+  validation tests accept legacy and new portrait/landscape paths, reject invalid
+  markers/date directories/suffixes, and cover orientation parameter validation.
+- Real Chromium with mocked device routes verified clockwise red/blue pixel
+  placement, aspect-preserving fit, white borders, repeated checkbox toggles,
+  120,016-byte packed upload contents, matching `p`/`l` request markers, legacy
+  gallery entries and mobile layout. These checks do not write the physical SD.
+- No firmware upload or display operation was performed for this change yet.
+  Normal versus accelerated display timing was not changed.

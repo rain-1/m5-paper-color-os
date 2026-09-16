@@ -15,6 +15,14 @@ int main(){
     assert(!picture::date("20260916_246025"));
     assert(picture::month("2026-09"));assert(!picture::month("2026-13"));
     assert(picture::path("/pictures/2026/09/20260916_143025_deadbeef.p6"));
+    assert(picture::path("/pictures/2026/09/20260916_143025_p_deadbeef.p6"));
+    assert(picture::path("/pictures/2026/09/20260916_143025_l_deadbeef.p6"));
+    assert(!picture::path("/pictures/2026/09/20260916_143025_x_deadbeef.p6"));
+    assert(!picture::path("/pictures/2026/09/20260916_143025_l_deadbeeG.p6"));
+    assert(!picture::path("/pictures/2026/08/20260916_143025_l_deadbeef.p6"));
+    assert(!picture::path("/pictures/2026/09/20260916_143025_l_deadbeef.p6.tmp"));
+    assert(picture::orientation("p")&&picture::orientation("l"));
+    for(auto s:{"", "ll", "L", "../"})assert(!picture::orientation(s));
     assert(!picture::path("/pictures/2026/08/20260916_143025_deadbeef.p6"));
     assert(!picture::path("/pictures/../../secret"));
 }

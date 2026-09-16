@@ -1,7 +1,11 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const source=fs.readFileSync('include/gallery.h','utf8').split('R"JS(')[1].split(')JS"')[0];
 const context={module:{exports:{}},Uint8Array,Float32Array,DataView};vm.runInNewContext(source,context);
-const {dimensions,checkDimensions,quantize}=context.module.exports;
+const {dimensions,checkDimensions,fittedSize,quantize}=context.module.exports;
+assert.deepEqual([...fittedSize(800,200,false)],[400,100]);
+assert.deepEqual([...fittedSize(800,200,true)],[600,150]);
+fittedSize(400,600,true).forEach((x,i)=>assert(Math.abs(x-[400*2/3,400][i])<1e-9));
+assert.throws(()=>fittedSize(0,100,true));
 const png=new Uint8Array(24);png.set([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82]);
 const v=new DataView(png.buffer);v.setUint32(16,400);v.setUint32(20,600);
 assert.deepEqual([...dimensions(png)],[400,600]);

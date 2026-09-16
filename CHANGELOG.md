@@ -5,6 +5,15 @@ compatibility, minor changes add features, patch changes fix or refine behaviour
 The current API and device screen use the same version. Release binaries are
 application images for the existing 16 MB partition layout.
 
+## 0.7.0
+
+- Picture uploader Landscape checkbox rotates pixels 90° clockwise before
+  aspect-preserving fitting, quantization and packing, with immediate preview.
+- New saved filenames include `_p_` or `_l_`; old pictures still list/display.
+- Upload orientation validated server-side; older clients default to portrait.
+- Long saved-picture paths wrap correctly in the mobile status message.
+- Display refresh timing is unchanged; this feature does not enable fast refresh.
+
 ## 0.6.0
 
 - Full-page refresh experiments: serif/sans text, inverse text, checkerboards,

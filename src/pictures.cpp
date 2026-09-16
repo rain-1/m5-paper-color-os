@@ -19,6 +19,7 @@ size_t received = 0;
 bool completed = false;
 String uploadError;
 String uploadDate;
+char uploadOrientation='p';
 uint32_t uploadTouched = 0;
 
 struct Lock {
@@ -128,7 +129,7 @@ void picturesRoutes(WebServer& s, void (*display)(const char*)) {
             resetUpload(); error(s,507,"Could not create SD directories."); return;
         }
         char suffix[10]; snprintf(suffix,sizeof(suffix),"_%08lx",(unsigned long)esp_random());
-        String path=month+"/"+uploadDate+suffix+".p6";
+        String path=month+"/"+uploadDate+"_"+uploadOrientation+suffix+".p6";
         String temp=path+".tmp";
         if (SD.exists(path) || SD.exists(temp)) { resetUpload(); error(s,409,"Filename collision. Retry upload."); return; }
         File file=SD.open(temp,FILE_WRITE);
@@ -168,7 +169,9 @@ void picturesRoutes(WebServer& s, void (*display)(const char*)) {
             // Only one file per request; stale disconnected requests can be discarded.
             bool duplicate=uploadBytes && millis()-uploadTouched < 15000;
             resetUpload(); uploadError=""; uploadDate=s.arg("date");
-            if (duplicate || !authorized(s) || !mounted || !picture::date(uploadDate.c_str())) uploadError="Rejected";
+            String orientation=s.hasArg("orientation")?s.arg("orientation"):"p";
+            uploadOrientation=orientation.length()?orientation[0]:'p';
+            if (duplicate || !authorized(s) || !mounted || !picture::date(uploadDate.c_str()) || !picture::orientation(orientation.c_str())) uploadError="Rejected";
             else uploadBytes=static_cast<uint8_t*>(ps_malloc(picture::fileSize));
             if (!uploadBytes) uploadError="Rejected";
         } else if (u.status==UPLOAD_FILE_WRITE && uploadBytes && uploadError.isEmpty()) {

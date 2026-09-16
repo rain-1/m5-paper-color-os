@@ -4,11 +4,12 @@ constexpr char GALLERY_HTML[] = R"HTML(<!doctype html><html lang="en"><meta char
 <title>Paper OS · Pictures</title><style>
 *{box-sizing:border-box}body{font:17px system-ui;background:#f4f1e8;color:#19231e;margin:0}main{max-width:850px;margin:auto;padding:30px}
 h1{font-size:44px;letter-spacing:-2px}section{padding:22px 0;border-top:2px solid #195d3b}button,input,select{font:inherit;padding:10px;margin:8px 0;max-width:100%}
-button{background:#195d3b;color:white;border:0;border-radius:6px;cursor:pointer}button:disabled{opacity:.5}canvas{display:block;width:200px;height:300px;background:white;border:1px solid #999;margin:15px 0}label{display:block}#message{min-height:3em;white-space:pre-wrap}li{margin:8px 0;overflow-wrap:anywhere}a{color:#195d3b}small{color:#526158}
+button{background:#195d3b;color:white;border:0;border-radius:6px;cursor:pointer;overflow-wrap:anywhere}button:disabled{opacity:.5}canvas{display:block;width:200px;height:300px;background:white;border:1px solid #999;margin:15px 0}label{display:block}#message{min-height:3em;white-space:pre-wrap;overflow-wrap:anywhere}li{margin:8px 0;overflow-wrap:anywhere}a{color:#195d3b}small{color:#526158}
 </style><main><nav>Paper OS / <a href="/books">Books</a> / <a href="/device">Device lab &amp; updates</a></nav><h1>Put something<br>on paper.</h1>
 <p id="card">Checking SD card…</p><section><label>Choose a JPEG or PNG <input id="file" type="file" accept="image/jpeg,image/png"></label>
 <small>Maximum 12 MB, 24 megapixels, 12,000 pixels per side. Conversion stays in this browser.</small>
 <label>Colour treatment <select id="dither"><option value="yes">Floyd–Steinberg dithering</option><option value="no">Solid six colours</option></select></label>
+<label><input id="landscape" type="checkbox"> Landscape · rotate 90° clockwise</label>
 <canvas id="preview" width="400" height="600"></canvas><small>Fits the whole image with white borders. Preview colours are approximate.</small><br>
 <button id="upload" disabled>Save to SD card</button><p id="message" role="status" aria-live="polite"></p></section>
 <section><h2>Your pictures</h2><input id="month" type="month"><button id="refresh">Load month</button><p>Showing up to 100 files per month. Select a picture to display it.</p><ul id="files"></ul></section></main><script src="/converter.js"></script></html>)HTML";
@@ -40,6 +41,11 @@ function dimensions(bytes) {
 function checkDimensions(w,h) {
   if(!w || !h || w>12000 || h>12000 || w*h>24000000) throw Error('Image too large: maximum 24 megapixels and 12,000 pixels per side.');
 }
+function fittedSize(w,h,landscape=false) {
+  checkDimensions(w,h);
+  const scale=landscape?Math.min(400/h,600/w):Math.min(400/w,600/h);
+  return [w*scale,h*scale];
+}
 function quantize(rgba,w,h,dither) {
   const work=new Float32Array(w*h*3), packed=new Uint8Array(16+w*h/2);
   packed.set([80,54,73,49,144,1,88,2]);
@@ -68,25 +74,29 @@ function quantize(rgba,w,h,dither) {
   }
   return packed;
 }
-if(typeof module!=='undefined') module.exports={dimensions,checkDimensions,quantize};
+if(typeof module!=='undefined') module.exports={dimensions,checkDimensions,fittedSize,quantize};
 if(typeof document!=='undefined') {
   const $=id=>document.getElementById(id), token=document.querySelector('meta[name="paper-token"]').content;
-  const ctx=$('preview').getContext('2d'); let converted=null, image=null, generation=0;
+  const ctx=$('preview').getContext('2d'); let converted=null, convertedOrientation='p', image=null, generation=0, uploading=false;
   const say=text=>$('message').textContent=text;
   async function request(url,options={}) {
     const response=await fetch(url,{...options,headers:{...options.headers,'X-Paper-Token':token}});
     const data=await response.json(); if(!response.ok)throw Error(data.error||'Request failed'); return data;
   }
   function convert() {
+    converted=null;$('upload').disabled=true;
     if(!image)return;
+    const landscape=$('landscape').checked;
     ctx.fillStyle='white';ctx.fillRect(0,0,400,600);
-    const scale=Math.min(400/image.naturalWidth,600/image.naturalHeight);
-    const w=image.naturalWidth*scale,h=image.naturalHeight*scale;
-    ctx.drawImage(image,(400-w)/2,(600-h)/2,w,h);
+    const [w,h]=fittedSize(image.naturalWidth,image.naturalHeight,landscape);
+    ctx.save();
+    try {ctx.translate(200,300);if(landscape)ctx.rotate(Math.PI/2);ctx.drawImage(image,-w/2,-h/2,w,h);}
+    finally {ctx.restore();}
     const pixels=ctx.getImageData(0,0,400,600);
     converted=quantize(pixels.data,400,600,$('dither').value==='yes');
-    ctx.putImageData(pixels,0,0);$('upload').disabled=false;
-    say('Ready. Only the converted 120 KB picture will be uploaded.');
+    convertedOrientation=landscape?'l':'p';
+    ctx.putImageData(pixels,0,0);$('upload').disabled=uploading;
+    say('Ready ('+(landscape?'landscape, rotated clockwise':'portrait')+'). Only the converted 120 KB picture will be uploaded. Filename marker: '+convertedOrientation+'.');
   }
   $('file').onchange=async()=>{
     const revision=++generation;converted=null;image=null;$('upload').disabled=true;
@@ -104,6 +114,7 @@ if(typeof document!=='undefined') {
     }catch(e){if(revision===generation)say(e.message);}
   };
   $('dither').onchange=()=>{try{convert();}catch(e){say(e.message);}};
+  $('landscape').onchange=()=>{try{convert();}catch(e){say(e.message);}};
   async function list() {
     try {
       const data=await request('/api/images?month='+encodeURIComponent($('month').value));
@@ -118,16 +129,16 @@ if(typeof document!=='undefined') {
     }catch(e){say(e.message);}
   }
   $('upload').onclick=async()=>{
-    if(!converted)return;$('upload').disabled=true;
+    if(!converted||uploading)return;uploading=true;$('upload').disabled=true;
     try {
       const now=new Date(),pad=n=>String(n).padStart(2,'0');
       const date=`${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
       const body=new FormData();body.append('image',new Blob([converted],{type:'application/octet-stream'}),'picture.p6');
       say('Saving and checking the SD card…');
-      const data=await request('/api/upload?date='+date,{method:'POST',body});
+      const data=await request('/api/upload?date='+date+'&orientation='+convertedOrientation,{method:'POST',body});
       $('month').value=`${now.getFullYear()}-${pad(now.getMonth()+1)}`;
       await list();say('Saved '+data.path+'. Select it below to display.');
-    }catch(e){say(e.message);}finally{$('upload').disabled=!converted;}
+    }catch(e){say(e.message);}finally{uploading=false;$('upload').disabled=!converted;}
   };
   const now=new Date();$('month').value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   $('refresh').onclick=list;

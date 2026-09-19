@@ -7,6 +7,7 @@
 #include "reader_page.h"
 #include "refresh_test.h"
 #include "menu_input.h"
+#include "status_light.h"
 #include <SD.h>
 #include <Preferences.h>
 #include <WiFi.h>
@@ -14,8 +15,8 @@
 
 namespace Reader {
 namespace {
-enum class View { Menu, Library, Reading, Fonts, Sampler, Info, FontMenu, Bookmarks };
-bool listView(View v){return v==View::Menu||v==View::Library||v==View::Fonts||v==View::FontMenu||v==View::Bookmarks;}
+enum class View { Menu, Library, Reading, Fonts, Sampler, Info, FontMenu, Bookmarks, ReaderMenu, PictureMonths, Pictures, Picture };
+bool listView(View v){return v==View::Menu||v==View::Library||v==View::Fonts||v==View::FontMenu||v==View::Bookmarks||v==View::ReaderMenu||v==View::PictureMonths||v==View::Pictures;}
 struct Book { String id,title; uint32_t size; };
 struct Progress { uint32_t magic=0x42524b31, offset=0, bookmark=UINT32_MAX; };
 struct Command { Action action; char id[9]; uint32_t value; bool wasActive; };
@@ -36,7 +37,7 @@ const FontChoice fontChoices[]={
     {&fonts::FreeMono12pt7b,"Typewriter / 12 pt"}
 };
 constexpr unsigned fontCount=sizeof(fontChoices)/sizeof(fontChoices[0]);
-const char* menuItems[]={"Continue reading","Library","Fonts","Bookmarks","Device information"};
+const char* menuItems[]={"Pictures","Reader","Library","Device information"};
 Preferences settings;
 SemaphoreHandle_t stateMutex;
 Snapshot snapshot;
@@ -47,6 +48,10 @@ View view=View::Menu;
 unsigned selection=0,fontIndex=0;
 unsigned listPage=0,listCount=0;
 std::vector<Book> books;
+std::vector<String> pictureMonths,picturePaths;
+String pictureMonth,shownPicture;
+unsigned pictureListPage=0;
+bool pictureStorageOk=true;
 char* text=nullptr;
 size_t textSize=0,pageIndex=0;
 String currentId,currentTitle,lastId;
@@ -146,14 +151,31 @@ void drawList(M5Canvas& c,const char* title,const std::vector<String>& rows){
     unsigned start=rows.size()>5?listPage*4:0;
     unsigned visible=rows.size()>5?std::min(size_t(4),rows.size()-start):rows.size();
     listCount=MenuInput::count(rows.size(),listPage);
-    if(rows.empty())c.drawString("No books yet. Open /books",24,112);
+    if(rows.empty()){
+        c.setFont(&fonts::Font2);
+        c.drawString(view==View::Library?"No books found. Import TXT files at /books.":pictureStorageOk?"No saved pictures here. Upload at /gallery.":"SD unavailable. Insert a FAT32 card; restart.",24,112);
+        c.drawString(view==View::Library?"Books need an inserted, readable SD card.":"Display-only uploads do not appear here.",24,146);
+        c.drawString("Double B or C returns to the menu.",24,180);
+    }
     for(unsigned i=0;i<listCount;++i){
         int y=90+i*83;auto bg=MenuInput::colours[i];
         c.fillRoundRect(18,y,364,73,5,bg);c.drawRoundRect(18,y,364,73,5,BLACK);
+        bool preview=view==View::Pictures&&i<visible;
+        int tx=preview?82:30,width=preview?284:338;
         c.setTextColor((i==0||i==3)?WHITE:BLACK,bg);
-        c.setFont(&fonts::Font2);c.drawString(String(i+1)+" / "+MenuInput::names[i],30,y+5);
-        c.setFont(&fonts::FreeSans12pt7b);
-        c.drawString(fit(c,i<visible?rows[start+i]:String("More books (next page)"),338),30,y+31);
+        c.setFont(&fonts::Font2);c.drawString(String(i+1)+" / "+MenuInput::names[i],tx,y+5);
+        if(preview){
+            String name=rows[start+i];name=name.substring(name.lastIndexOf('/')+1);
+            String date=name.substring(0,4)+"-"+name.substring(4,6)+"-"+name.substring(6,8)+" "+name.substring(9,11)+":"+name.substring(11,13)+":"+name.substring(13,15);
+            c.drawString(fit(c,date,width),tx,y+28);
+            c.drawString(fit(c,name.substring(16),width),tx,y+48);
+            if(!picturesPreview(c,rows[start+i].c_str(),26,y+3)){
+                c.fillRect(26,y+3,44,66,WHITE);c.setTextColor(BLACK,WHITE);c.drawString("?",41,y+25);
+            }
+        }else{
+            c.setFont(&fonts::FreeSans12pt7b);
+            c.drawString(fit(c,i<visible?rows[start+i]:String("More (next page)"),width),tx,y+31);
+        }
     }
     c.setTextColor(BLACK,WHITE);c.setFont(&fonts::Font2);
     c.drawString("LED = selection / A up / B down",24,518);
@@ -180,6 +202,7 @@ bool request(Action action,const char* id,uint32_t value){
     xSemaphoreTake(stateMutex,portMAX_DELAY);
     if(snapshot.busy){xSemaphoreGive(stateMutex);return false;}
     if(snapshot.active&&listView(snapshot.view)&&(action==Action::Previous||action==Action::Next)){
+        StatusLight::menuActivity();
         snapshot.selection=MenuInput::move(snapshot.selection,snapshot.count,action==Action::Next);
         xSemaphoreGive(stateMutex);return true; // No display scheduling or SD work.
     }
@@ -208,7 +231,9 @@ bool render(M5Canvas& canvas,int battery){
         case Action::Menu:view=View::Menu;selection=listPage=0;break;
         case Action::Back:
             if(view==View::Fonts||view==View::Sampler)view=View::FontMenu;
-            else if(view==View::Menu)view=pages.empty()?View::Info:View::Reading;
+            else if(view==View::FontMenu||view==View::Bookmarks||view==View::Reading)view=View::ReaderMenu;
+            else if(view==View::Pictures)view=View::PictureMonths;
+            else if(view==View::Picture){view=View::Pictures;selection=0;listPage=pictureListPage;break;}
             else view=View::Menu;
             selection=listPage=0;break;
         case Action::Resume:if(!currentId.isEmpty()&&!pages.empty())view=View::Reading;else if(!loadBook(lastId,canvas))view=View::Menu;break;
@@ -234,14 +259,31 @@ bool render(M5Canvas& canvas,int battery){
                 if((delta<0&&pageIndex==0)||(delta>0&&pageIndex+1>=pages.size())){message=delta<0?"Beginning of book.":"End of book.";publish();Feedback::play(Feedback::Cue::Busy);return false;}
                 pageIndex+=delta;
             }else{
-                size_t count=view==View::Library?books.size():view==View::Fonts?fontCount:view==View::FontMenu||view==View::Bookmarks?2:5;
-                if(view==View::Info||view==View::Sampler){view=View::Menu;selection=0;}
+                size_t count=listCount;
+                if(view==View::Picture){view=View::Pictures;listPage=pictureListPage;selection=0;}
+                else if(view==View::Info||view==View::Sampler){view=View::Menu;selection=0;}
                 else if(count)selection=(selection+count+delta)%count;
             }
             break;
         }
         case Action::Select:
             if(view==View::Reading||view==View::Info||view==View::Sampler){view=View::Menu;selection=0;}
+            else if(view==View::Picture){view=View::Pictures;listPage=pictureListPage;selection=0;}
+            else if(view==View::PictureMonths||view==View::Pictures){
+                auto& rows=view==View::PictureMonths?pictureMonths:picturePaths;
+                if(rows.empty()){view=View::Menu;selection=listPage=0;}
+                else if(rows.size()>5&&selection==listCount-1){listPage=(listPage+1)%((rows.size()+3)/4);selection=0;}
+                else {
+                    unsigned i=(rows.size()>5?listPage*4:0)+selection;
+                    if(view==View::PictureMonths){pictureMonth=rows[i];pictureStorageOk=picturesList(pictureMonth,picturePaths);view=View::Pictures;selection=listPage=0;}
+                    else {shownPicture=rows[i];pictureListPage=listPage;view=View::Picture;}
+                }
+            }
+            else if(view==View::ReaderMenu){
+                if(selection==0){if(!currentId.isEmpty()&&!pages.empty())view=View::Reading;else loadBook(lastId,canvas);}
+                else if(selection==1){view=View::FontMenu;selection=0;}
+                else {view=View::Bookmarks;selection=0;}
+            }
             else if(view==View::Library){
                 if(books.empty()){view=View::Menu;selection=0;}
                 else if(books.size()>5&&selection==listCount-1){listPage=(listPage+1)%((books.size()+3)/4);selection=0;}
@@ -256,14 +298,17 @@ bool render(M5Canvas& canvas,int battery){
                 else{view=View::Menu;selection=0;}
             }else{
                 switch(selection){
-                    case 0:if(!currentId.isEmpty()&&!pages.empty())view=View::Reading;else loadBook(lastId,canvas);break;
-                    case 1:scanLibrary();view=View::Library;selection=listPage=0;break;
-                    case 2:view=View::FontMenu;selection=0;break;
-                    case 3:view=View::Bookmarks;selection=0;break;
-                    case 4:view=View::Info;break;
+                    case 0:pictureStorageOk=picturesMonths(pictureMonths);view=View::PictureMonths;selection=listPage=0;break;
+                    case 1:view=View::ReaderMenu;selection=listPage=0;break;
+                    case 2:scanLibrary();view=View::Library;selection=listPage=0;break;
+                    case 3:view=View::Info;break;
                 }
             }
             break;
+    }
+    if(view==View::Picture){
+        if(picturesDraw(canvas,shownPicture.c_str())){publish();return true;}
+        view=View::Pictures;listPage=pictureListPage;selection=0;message="Picture unavailable. Choose another or go back.";
     }
     if(view==View::Reading&&!pages.empty()){
         canvas.fillSprite(WHITE);canvas.setTextColor(BLACK,WHITE);canvas.setTextSize(1);canvas.setTextDatum(top_left);
@@ -281,7 +326,9 @@ bool render(M5Canvas& canvas,int battery){
     }else if(view==View::Info){
         heading(canvas,"Paper OS");canvas.setFont(&fonts::FreeSans12pt7b);
         canvas.drawString(String("Version ")+PAPER_OS_VERSION,24,105);canvas.drawString(String("Battery ")+battery+"%",24,156);
-        canvas.drawString(WiFi.localIP().toString(),24,210);canvas.drawString("Open /books in your browser",24,261);
+        canvas.drawString(WiFi.status()==WL_CONNECTED?WiFi.localIP().toString():String("Offline / hold B for Wi-Fi"),24,210);
+        canvas.setFont(&fonts::Font2);canvas.drawString("Browser: /gallery /books /device",24,261);
+        canvas.drawString("Wi-Fi: "+fit(canvas,WiFi.status()==WL_CONNECTED?WiFi.SSID():String("not connected"),280),24,297);
         canvas.setFont(&fonts::Font2);canvas.drawString("A: upper-left / B: lower-left / C: top",24,370);
         canvas.drawString("Hold A: bookmark / Hold B: Wi-Fi",24,402);canvas.drawString("Hold C: unlock firmware updates",24,434);
         footer(canvas,"C: menu");
@@ -291,6 +338,9 @@ bool render(M5Canvas& canvas,int battery){
         else if(view==View::Fonts){for(const auto& font:fontChoices)rows.push_back(font.label);drawList(canvas,"Reading font",rows);}
         else if(view==View::FontMenu){rows={"Choose reading font","Font comparison sheet"};drawList(canvas,"Fonts",rows);}
         else if(view==View::Bookmarks){rows={"Bookmark this page","Go to bookmark"};drawList(canvas,"Bookmarks",rows);}
+        else if(view==View::ReaderMenu){rows={"Continue reading","Fonts","Bookmarks"};drawList(canvas,"Reader",rows);}
+        else if(view==View::PictureMonths){drawList(canvas,"Picture months",pictureMonths);}
+        else if(view==View::Pictures){drawList(canvas,("Pictures / "+pictureMonth).c_str(),picturePaths);}
         else{for(const auto& item:menuItems)rows.push_back(item);drawList(canvas,"Paper OS",rows);}
     }
     if(!message.isEmpty()){canvas.fillRect(20,554,360,46,WHITE);canvas.setFont(&fonts::Font2);canvas.setTextColor(BLACK,WHITE);canvas.drawString(fit(canvas,message,352),24,566);}
@@ -310,7 +360,7 @@ void routes(WebServer& server,const String& token){
         String body=String("{\"active\":")+(s.active?"true":"false")+",\"busy\":"+(s.busy?"true":"false");
         body+=",\"id\":\""+String(s.id)+"\",\"title\":\""+escaped(s.title)+"\",\"message\":\""+escaped(s.message)+"\"";
         body+=",\"page\":"+String(s.page)+",\"pages\":"+String(s.pages)+",\"offset\":"+String(s.offset)+",\"font\":"+String(s.font)+",\"hasBookmark\":"+(s.bookmark==UINT32_MAX?"false":"true")+"}";
-        const char* views[]={"menu","library","reading","fonts","sampler","info","font-menu","bookmarks"};
+        const char* views[]={"menu","library","reading","fonts","sampler","info","font-menu","bookmarks","reader-menu","picture-months","pictures","picture"};
         body.remove(body.length()-1);body+=",\"view\":\""+String(views[unsigned(s.view)])+"\",\"selection\":"+String(s.selection)+",\"menuCount\":"+String(s.count)+"}";
         server.sendHeader("Cache-Control","no-store");server.send(200,"application/json",body);
     });

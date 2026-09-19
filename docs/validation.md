@@ -120,6 +120,17 @@ can be considered implemented on hardware. Audible cues remain independent.
 - Accelerated transitions between the new full-page patterns await user testing;
   no claim of visual quality is made from timing/status telemetry alone.
 
+## 0.12.0 picture menus and LED idle-off — host verified, pending installation
+
+- Firmware build and host menu dispatcher tests cover the additional reader,
+  picture-month and picture-list menus. Selection moves schedule no screen work.
+- ASan/UBSan tests cover bounded newest-first ordering, month order, every preview
+  coordinate, existing picture format validation and menu pagination/gestures.
+- LED timer tests cover exactly 30 seconds, waking the unchanged selection,
+  menu re-entry and millis rollover. Browser converter/reader regressions pass.
+- On-device SD browsing, preview legibility and physical LED timeout remain to
+  be verified after installation. No display timing changes or hardware writes.
+
 ## 0.11.0 LED menu selection — host verified, pending installation
 
 - Host tests exercise delayed singles/double select/back, long-hold cancellation,

@@ -9,6 +9,7 @@
 #include <SD.h>
 #include <SPI.h>
 #include <esp_system.h>
+#include <algorithm>
 
 SemaphoreHandle_t pictureBus;
 namespace {
@@ -213,6 +214,52 @@ void picturesRoutes(WebServer& s, void (*display)(const char*)) {
     });
 }
 
+namespace {
+void newest(std::vector<String>& items,const String& value,size_t limit){
+    auto at=std::lower_bound(items.begin(),items.end(),value,[](const String& a,const String& b){return a.compareTo(b)>0;});
+    if(at==items.end()&&items.size()>=limit)return;
+    items.insert(at,value);if(items.size()>limit)items.pop_back();
+}
+}
+bool picturesMonths(std::vector<String>& months){
+    months.clear();if(!mounted)return false;
+    File root=SD.open("/pictures");if(!root||!root.isDirectory())return false;
+    while(File year=root.openNextFile()){
+        String y=year.name();if(!year.isDirectory()||y.length()!=4||y[0]!='2')continue;
+        bool digits=true;for(unsigned i=0;i<4;++i)digits&=y[i]>='0'&&y[i]<='9';if(!digits)continue;
+        while(File month=year.openNextFile()){
+            String m=y+"-"+month.name();
+            if(month.isDirectory()&&picture::month(m.c_str()))newest(months,m,120);
+            delay(1);
+        }
+    }
+    return true;
+}
+bool picturesList(const String& month,std::vector<String>& paths){
+    paths.clear();if(!mounted||!picture::month(month.c_str()))return false;
+    String directory="/pictures/"+month.substring(0,4)+"/"+month.substring(5,7);
+    File dir=SD.open(directory);if(!dir||!dir.isDirectory())return false;
+    while(File file=dir.openNextFile()){
+        String path=directory+"/"+file.name();
+        if(!file.isDirectory()&&picture::path(path.c_str())&&file.size()==picture::fileSize)newest(paths,path,100);
+        delay(1);
+    }
+    return true;
+}
+bool picturesPreview(M5Canvas& canvas,const char* path,int x,int y){
+    if(!mounted||!picture::path(path))return false;
+    File file=SD.open(path);if(!file||file.size()!=picture::fileSize)return false;
+    auto bytes=static_cast<uint8_t*>(ps_malloc(picture::fileSize));if(!bytes)return false;
+    bool ok=file.read(bytes,picture::fileSize)==picture::fileSize&&picture::valid(bytes,picture::fileSize);
+    if(ok){
+        const uint16_t colors[]={BLACK,WHITE,YELLOW,RED,BLUE,GREEN};
+        for(unsigned py=0;py<66;++py)for(unsigned px=0;px<44;++px){
+            unsigned i=((py*600+300)/66)*400+(px*400+200)/44;
+            uint8_t b=bytes[16+i/2];canvas.drawPixel(x+px,y+py,colors[(i&1)?b&15:b>>4]);
+        }
+    }
+    free(bytes);return ok;
+}
 bool picturesDraw(M5Canvas& canvas, const char* path) {
     uint8_t* bytes=nullptr;
     bool ok=false;

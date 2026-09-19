@@ -5,6 +5,17 @@ compatibility, minor changes add features, patch changes fix or refine behaviour
 The current API and device screen use the same version. Release binaries are
 application images for the existing 16 MB partition layout.
 
+## 0.12.0
+
+- Four-item root: Pictures (red), Reader (yellow), Library (green), Device
+  information (blue). Reader groups Continue, Fonts and Bookmarks.
+- Offline SD picture browser with newest-first month/file lists, exact-palette
+  thumbnails and timestamps; explicit More pages and C to return from a picture.
+- Missing-card, empty-list and corrupt-picture handling; device information
+  includes network name and browser routes.
+- Menu LEDs switch off after 30 seconds idle. A menu button wakes the selected
+  colour; navigation stays screen-refresh-free. No panel timing changes.
+
 ## 0.11.1
 
 - Use white labels and text on solid red menu blocks for better readability,

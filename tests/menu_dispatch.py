@@ -12,17 +12,18 @@ source = r'''
 #include <cstdio>
 #include "menu_input.h"
 enum class Action''' + action + r''';
-enum class View {Menu,Library,Reading,Fonts,Sampler,Info,FontMenu,Bookmarks};
-bool listView(View v){return v==View::Menu||v==View::Library||v==View::Fonts||v==View::FontMenu||v==View::Bookmarks;}
+enum class View {Menu,Library,Reading,Fonts,Sampler,Info,FontMenu,Bookmarks,ReaderMenu,PictureMonths,Pictures,Picture};
+bool listView(View v){return v==View::Menu||v==View::Library||v==View::Fonts||v==View::FontMenu||v==View::Bookmarks||v==View::ReaderMenu||v==View::PictureMonths||v==View::Pictures;}
 struct Snapshot {bool busy=false,active=true;View view=View::Menu;unsigned selection=0,count=5;} snapshot;
 struct Command {Action action;char id[9];uint32_t value;bool wasActive;} pending;
 int stateMutex=1,portMAX_DELAY=0,scheduled=0;
 void xSemaphoreTake(int,int){} void xSemaphoreGive(int){}
 void schedule(){++scheduled;} void (*scheduleScreen)()=schedule;
 namespace RefreshTest {bool fault=false;bool faulted(){return fault;}}
+namespace StatusLight {void menuActivity(){}}
 bool request(Action action''' + request + r'''
 int main(){
-  for(auto v:{View::Menu,View::Library,View::Fonts,View::FontMenu,View::Bookmarks}){
+  for(auto v:{View::Menu,View::Library,View::Fonts,View::FontMenu,View::Bookmarks,View::ReaderMenu,View::PictureMonths,View::Pictures}){
     snapshot.view=v;snapshot.selection=0;scheduled=0;snapshot.busy=false;
     for(int i=0;i<100;++i){assert(request(Action::Next,"",0));assert(!snapshot.busy);assert(scheduled==0);}
     assert(snapshot.selection==0);assert(request(Action::Previous,"",0));assert(snapshot.selection==4);

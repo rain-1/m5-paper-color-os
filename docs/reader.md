@@ -1,4 +1,4 @@
-# TXT reader and colour menus — firmware 0.11.0
+# TXT reader and colour menus — firmware 0.12.0
 
 Open `/books` on the device's local address. Import a `.txt`, inspect the prepared
 preview, save it, then choose **Read**. No internet or cloud service is involved.
@@ -21,15 +21,19 @@ a screen refresh; the saved sound confirms it. Sounds can be muted in `/device`.
 
 Menus are fixed coloured blocks with a colour name and row number; there is no
 moving on-screen highlight. Both RGB LEDs show the selected row. Root menu:
-red Continue reading, yellow Library, green Fonts, blue Bookmarks, white Device.
-Fonts opens Choose reading font / Font comparison sheet; Bookmarks opens Save / Recall.
+red Pictures, yellow Reader, green Library, blue Device information.
+Reader opens Continue reading / Fonts / Bookmarks. Fonts opens Choose reading
+font / Font comparison sheet; Bookmarks opens Save / Recall.
 
 In menus, single A/B moves up/down without scheduling any display refresh.
 Double A chooses; double B goes back. C also chooses immediately. A single tap
 is delayed 350 ms to distinguish doubles; long holds cancel pending taps.
 The LED is steady while choosing and takes priority over notification flashes.
+After 30 seconds without menu activity it switches off; pressing a menu button
+wakes the current colour. The existing press action still applies (single moves,
+double chooses/back). This is LED power saving, not whole-device sleep.
 Selecting or exiting a menu may refresh the screen. Back from the root returns
-to the loaded book, or Device information if no book is loaded.
+to the root itself; nested menus return to their parent.
 
 Lists of up to five items use all five colour rows. Larger libraries show four
 books plus an explicit More choice, which refreshes to the next group (wrapping

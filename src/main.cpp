@@ -381,6 +381,7 @@ void loop() {
         }
     };
     if(!Reader::menuPicking())clicks.clear();
+    else if(M5.BtnA.wasPressed()||M5.BtnB.wasPressed()||M5.BtnC.wasPressed())StatusLight::menuActivity();
     if (M5.BtnA.pressedFor(2500) && !aLong) {
         aLong=true;clicks.clear();
         if (Reader::active()) readerAction(Reader::Action::Bookmark);

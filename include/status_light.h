@@ -6,4 +6,5 @@ bool begin();
 bool ready();
 void flash(uint32_t colour,uint32_t duration,int index=-1);
 void tick(int menuSelection);
+void menuActivity();
 }

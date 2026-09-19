@@ -5,6 +5,7 @@
 namespace StatusLight {
 namespace {
 rmt_obj_t* output=nullptr;
+MenuInput::LightTimer menuTimer;
 uint32_t colour=0,until=0,last[2]={UINT32_MAX,UINT32_MAX};int led=-1;
 void write(uint32_t a,uint32_t b){
     if(!output||(last[0]==a&&last[1]==b))return;
@@ -28,8 +29,10 @@ bool begin(){
 }
 bool ready(){return output!=nullptr;}
 void flash(uint32_t c,uint32_t duration,int index){colour=c;until=millis()+duration;led=index;}
+void menuActivity(){menuTimer.touch(millis());}
 void tick(int selection){
-    if(selection>=0&&selection<5){auto c=MenuInput::colours[selection];write(c,c);return;}
+    bool lit=menuTimer.visible(selection,millis());
+    if(selection>=0&&selection<5){auto c=lit?MenuInput::colours[selection]:0;write(c,c);return;}
     if(until&&int32_t(millis()-until)<0)write(led==1?0:colour,led==0?0:colour);
     else {until=0;write(0,0);}
 }

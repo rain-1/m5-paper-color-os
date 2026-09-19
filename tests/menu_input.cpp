@@ -3,6 +3,12 @@
 #include <cstdio>
 using namespace MenuInput;
 int main(){
+    LightTimer light;
+    assert(light.visible(0,100));assert(light.visible(0,30099));assert(!light.visible(0,30100));
+    light.touch(31000);assert(light.visible(0,31000)); // wake same choice, no navigation
+    assert(light.visible(1,60000));assert(!light.visible(1,90000));
+    assert(!light.visible(-1,90001));assert(light.visible(1,90002));
+    light.touch(UINT32_MAX-100);assert(light.visible(1,100));assert(!light.visible(1,30000));
     Clicks c;
     assert(c.release(0,100)==Event::None);
     assert(c.tick(450)==Event::None);assert(c.tick(451)==Event::Up);

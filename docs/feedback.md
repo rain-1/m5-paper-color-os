@@ -32,3 +32,8 @@ The pinned M5Unified IDF4 encoder was unimplemented; a two-pixel GRB driver now
 uses the Arduino legacy RMT API on GPIO21 at bounded brightness. The main task
 owns all LED writes. `/api/device` reports `ledReady`; physical colour/order
 and visibility still need checking on installation.
+
+From 0.12.0, menu LEDs turn off after 30 seconds without navigation or a physical
+menu-button press. The choice is retained. The next press wakes the light and
+retains its normal single/double/hold behaviour. Transient notification flashes
+do not override the idle-off menu state. The ESP32 remains awake.

@@ -88,6 +88,10 @@ changes only the LED (350 ms double-tap window); double A chooses and double B
 goes back. C remains an immediate choose shortcut. Only choosing/back or explicit
 More-page selection refreshes the menu. Startup shows the menu rather than
 automatically opening the last book; Continue reading restores your place.
+The root is **Pictures / Reader / Library / Device information**. Reader contains
+Continue reading, Fonts and Bookmarks. Menu LEDs turn off after 30 seconds idle;
+a menu button wakes them without changing the stored selection on key-down.
+Normal tap actions still apply. This does not put the whole device to sleep.
 Hold **C** for 2.5 seconds to unlock firmware updates for two
 minutes; a short beep and green LED flash confirm that you can release it.
 The lab page shows the remaining time.
@@ -123,6 +127,14 @@ which are not shown in the gallery. The gallery lists up to 100 files per month.
 Existing files are never overwritten. Originals are not stored.
 
 **Save to SD & display** queues the verified image using normal refresh timing.
+To browse without a phone, choose **Pictures** on the device, select a month,
+then select a thumbnail. Lists show the newest 120 month directories and newest
+100 valid-sized picture paths per month, in descending filename order. Legacy
+filenames are included. Up/down changes only LED selection; explicit More opens
+the next group, wrapping at the end. C on a displayed picture returns to its list;
+double B in the list returns to months, then the root menu. Previews and display
+validate the packed palette; damaged files show a placeholder or an error.
+Opening Pictures again rescans the SD. RAM-only uploads are not included.
 **Display only · don't save** instead uploads to temporary RAM, with no SD writes
 or gallery entry, and works without a card. RAM is released after drawing; if a
 queued request is superseded, at most one image remains until another temporary

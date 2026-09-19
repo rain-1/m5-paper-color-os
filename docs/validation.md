@@ -120,7 +120,24 @@ can be considered implemented on hardware. Audible cues remain independent.
 - Accelerated transitions between the new full-page patterns await user testing;
   no claim of visual quality is made from timing/status telemetry alone.
 
-## 0.13.0 voice notes — host checks, hardware acceptance pending
+## 0.14.0 colour audio menus / speaker playback — pending installation
+
+- Actual playback worker exercised with deterministic SD/speaker fakes under
+  ASan/UBSan: completed playback, stop, explicit buffer-release ownership, bad
+  WAV, missing file, SD read failure, speaker start/queue failure and timeout.
+- WAV validation checks every header byte, exact file length, nonempty 16-bit
+  samples and five-minute bound. Recording worker regressions still pass.
+- Dispatcher host test covers both audio menus: cursor movement never schedules
+  screen work. Browser voice UI and firmware build pass.
+- Physical playback quality, volume, stop latency and menu/audio transitions
+  still require installation and user testing. No recording or audio playback
+  was remotely triggered while developing this update.
+
+## 0.13.0 voice notes — installed; hardware acceptance incomplete
+
+- OTA verified version 0.13.0, indicator available, OTA locked and microphone
+  idle. A user's failed recording attempt was traced to unset clock via status;
+  successful capture quality has not been verified by these checks.
 
 - Firmware builds against pinned libraries. Actual capture worker exercised with
   fake SD/microphone: explicit stop, five-minute cap, missing/full SD, directory,

@@ -4,7 +4,7 @@ constexpr char VOICE_HTML[]=R"HTML(<!doctype html><html lang="en"><meta charset=
 <a href="/gallery">Pictures</a> / <a href="/books">Books</a> / <a href="/device">Device</a><h1>Voice notes</h1>
 <p>Records the PaperColor's microphone, not your phone. Five-minute limit; 16 kHz mono WAV. Keep the SD card inserted and do not power off while recording or saving. Recordings stay on your SD card; anyone on the same network who can access this device can listen to saved notes.</p>
 <button id="start">Start recording</button><button id="stop">Stop &amp; save</button><p id="status" role="status">Loading…</p>
-<p>On the device: choose Voice notes, then A to record. While recording, release any user button to stop. The dim blinking LED means recording is active. No screen refresh during recording.</p>
+<p>On the device: Voice notes has the usual colour menu. Red: Record a note; yellow: Saved recordings. A/B moves the LED; C or double-A chooses; double-B goes back. Select a saved note to play through the speaker. Release any user button to stop audio. Blinking red means recording; blinking blue means playback. No screen refresh during audio.</p>
 <h2>Clock</h2><button id="clock">Use phone/computer time</button><p>Filenames use UTC. Set the clock once before recording; the battery-backed clock keeps time offline.</p>
 <h2>Saved notes</h2><input id="month" type="month"><button id="list">Load month</button><ul id="files"></ul><p>Shows the newest 100 notes in the selected month. Interrupted .part files are retained on SD for recovery, not listed as finished recordings.</p><script src="/voice.js"></script></html>)HTML";
 constexpr char VOICE_JS[]=R"JS(

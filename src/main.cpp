@@ -393,14 +393,6 @@ void loop() {
     if(Voice::active()){
         clicks.clear();aLong=bLong=cLong=true;
         if(M5.BtnA.wasReleased()||M5.BtnB.wasReleased()||M5.BtnC.wasReleased())Voice::stop();
-    }else if(Reader::voiceControls()){
-        clicks.clear();
-        if(M5.BtnC.pressedFor(2500))cLong=true;
-        if(M5.BtnA.wasReleased()&&!aLong){if(!Voice::start())Feedback::play(Feedback::Cue::Error);}
-        if(M5.BtnC.wasReleased()&&!cLong)readerAction(Reader::Action::Menu);
-        if(!M5.BtnA.isPressed())aLong=false;
-        if(!M5.BtnB.isPressed())bLong=false;
-        if(!M5.BtnC.isPressed())cLong=false;
     }else{
     if(!Reader::menuPicking())clicks.clear();
     else if(M5.BtnA.wasPressed()||M5.BtnB.wasPressed()||M5.BtnC.wasPressed())StatusLight::menuActivity();

@@ -5,6 +5,15 @@ compatibility, minor changes add features, patch changes fix or refine behaviour
 The current API and device screen use the same version. Release binaries are
 application images for the existing 16 MB partition layout.
 
+## 0.14.0
+
+- Voice notes now uses the standard colour menus: Record a note / Saved recordings.
+- Offline speaker playback, newest-first dated note list, pagination, blue audio
+  indicator and any-button stop. Selection and starting audio do not refresh.
+- Strict WAV format/length validation; bounded streaming buffers with explicit
+  release tracking. Playback excludes recording, display/SD work and OTA.
+- Recording/playback failures now show an on-screen explanation.
+
 ## 0.13.0
 
 - Voice notes (white, fifth root item): A starts; any user-button release stops.

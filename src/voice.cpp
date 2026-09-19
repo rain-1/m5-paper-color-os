@@ -18,6 +18,9 @@ namespace Voice {
 namespace {
 constexpr size_t samples=8192;
 QueueHandle_t filled=nullptr;
+QueueHandle_t commands=nullptr;
+struct Command {char path[49];};
+bool playback=false;
 int16_t* buffers[2]{};
 std::atomic<bool> running{false}, stopping{false}, finished{false}, overflow{false};
 std::atomic<uint32_t> bytes{0}, peak{0};
@@ -83,17 +86,83 @@ void captureWork(){
     success=ok;
 }
 void capture(void*){captureWork();finished.store(true,std::memory_order_release);vTaskDelete(nullptr);}
+void played(void*,const void* data,uint8_t){int i=data==buffers[0]?0:1;if(xQueueSend(filled,&i,0)!=pdTRUE)overflow=true;}
+void playbackWork(){
+    bool locked=xSemaphoreTake(pictureBus,0)==pdTRUE;
+    bool ok=false;
+    if(!locked)message="Display or SD busy. Try again.";
+    else do {
+        File file=SD.open(path);uint8_t h[44];
+        if(!file||file.isDirectory()||file.read(h,44)!=44||!VoiceFormat::validHeader(h,file.size())){message="Invalid or missing Paper OS WAV recording.";break;}
+        if(!M5.Speaker.begin()){message="Speaker could not start.";break;}
+        M5.Speaker.setVolume(80); // Moderate explicit playback volume, independent of cue mute.
+        xQueueReset(filled);M5.Speaker.setBufferReleaseCallback(nullptr,played);
+        uint32_t remaining=file.size()-44;size_t lengths[2]{};int outstanding=0;ok=true;
+        auto queue=[&](int i){
+            size_t n=std::min(size_t(remaining),samples*2);
+            if(file.read(reinterpret_cast<uint8_t*>(buffers[i]),n)!=n)return false;
+            if(!M5.Speaker.playRaw(buffers[i],n/2,VoiceFormat::rate,false,1,0,false))return false;
+            remaining-=n;lengths[i]=n;++outstanding;return true;
+        };
+        for(int i=0;i<2&&remaining;++i)if(!queue(i)){ok=false;break;}
+        message="Playing. Release any user button to stop.";
+        uint32_t waitedAt=millis();
+        while(ok&&outstanding&&!stopping){
+            int i;
+            if(xQueueReceive(filled,&i,pdMS_TO_TICKS(50))!=pdTRUE){if(millis()-waitedAt>2000)ok=false;continue;}
+            waitedAt=millis();--outstanding;bytes.fetch_add(lengths[i]);
+            if(overflow){ok=false;break;}
+            if(remaining&&!queue(i))ok=false;
+        }
+        // Buffer release precedes the last samples leaving I2S. Let DMA drain.
+        if(ok&&!stopping)for(int i=0;i<20&&!stopping;++i)delay(10);
+        message=ok?(stopping?"Playback stopped.":"Playback finished."):"Playback failed: SD read or audio timeout.";
+    }while(false);
+    M5.Speaker.end();M5.Speaker.setBufferReleaseCallback(nullptr,nullptr);M5.Speaker.setVolume(48);
+    if(locked)xSemaphoreGive(pictureBus);success=ok;
+}
+void playbackTask(void*){playbackWork();finished.store(true,std::memory_order_release);vTaskDelete(nullptr);}
 void json(WebServer& s,int code,const String& body){s.sendHeader("Cache-Control","no-store");s.send(code,"application/json",body);}
 void error(WebServer& s,int code,const char* text){json(s,code,String("{\"error\":\"")+text+"\"}");}
 struct Lock {bool held;Lock():held(xSemaphoreTake(pictureBus,0)==pdTRUE){}~Lock(){if(held)xSemaphoreGive(pictureBus);}};
 }
 void begin(){
     filled=xQueueCreate(2,sizeof(int));
+    commands=xQueueCreate(1,sizeof(Command));
     for(auto& buffer:buffers)buffer=static_cast<int16_t*>(ps_malloc(samples*sizeof(int16_t)));
 }
 bool active(){return running.load();}
+bool playing(){return active()&&playback;}
+const char* status(){return message.load();}
+bool enqueue(const char* name){Command cmd{};if(!commands||active()||strlen(name)>48)return false;strlcpy(cmd.path,name,sizeof(cmd.path));return xQueueSend(commands,&cmd,0)==pdTRUE;}
+bool list(std::vector<String>& paths){
+    paths.clear();if(SD.cardType()==CARD_NONE)return false;
+    File root=SD.open("/recordings");if(!root)return true;
+    while(File year=root.openNextFile()){
+        if(!year.isDirectory())continue;String y=year.name();
+        if(y.length()!=4)continue;
+        while(File month=year.openNextFile()){
+            String m=month.name();if(!month.isDirectory()||!picture::month((y+"-"+m).c_str()))continue;
+            while(File file=month.openNextFile()){
+                String p="/recordings/"+y+"/"+m+"/"+file.name();
+                if(!file.isDirectory()&&VoiceFormat::path(p.c_str())&&file.size()>=46&&file.size()<=VoiceFormat::maxBytes+44){
+                    auto at=std::lower_bound(paths.begin(),paths.end(),p,[](const String&a,const String&b){return a.compareTo(b)>0;});
+                    if(at!=paths.end()||paths.size()<100){paths.insert(at,p);if(paths.size()>100)paths.pop_back();}
+                }delay(1);
+            }
+        }
+    }return true;
+}
+bool play(const char* name){
+    if(active()||Reader::busy()||RefreshTest::faulted()){message="Audio or display busy.";return false;}
+    if(!VoiceFormat::path(name)||!filled||!buffers[0]||!buffers[1]){message="Invalid recording or audio unavailable.";return false;}
+    path=name;playback=true;stopping=false;finished=false;overflow=false;bytes=0;peak=0;
+    Feedback::suspend(true);M5.Speaker.end();running=true;powerAt=millis();
+    if(xTaskCreate(playbackTask,"voice-play",6144,nullptr,2,nullptr)!=pdPASS){running=false;Feedback::suspend(false);message="Cannot start playback task.";return false;}return true;
+}
 bool start(){
     if(active()){message="Already recording. Stop and save first.";return false;}
+    if(commands&&uxQueueMessagesWaiting(commands)){message="An audio action is already queued.";return false;}
     if(!filled||!buffers[0]||!buffers[1]||!StatusLight::ready()){message="Recording unavailable: memory or indicator failure.";return false;}
     if(Reader::busy()||RefreshTest::faulted()){message="Wait for the display to finish.";return false;}
     {Lock lock;if(!lock.held){message="Display or SD busy. Try again when finished.";return false;}}
@@ -102,7 +171,7 @@ bool start(){
     time_t now=time(nullptr);struct tm utc{};gmtime_r(&now,&utc);
     if(!PaperClock::ready()||utc.tm_year<124||utc.tm_year>199){message="Set the clock at /voice before recording.";return false;}
     char name[64];snprintf(name,sizeof(name),"/recordings/%04d/%02d/%04d%02d%02d_%02d%02d%02d_%08lx.wav",utc.tm_year+1900,utc.tm_mon+1,utc.tm_year+1900,utc.tm_mon+1,utc.tm_mday,utc.tm_hour,utc.tm_min,utc.tm_sec,(unsigned long)esp_random());path=name;
-    stopping=false;finished=false;overflow=false;bytes=0;peak=0;message="Starting microphone…";
+    playback=false;stopping=false;finished=false;overflow=false;bytes=0;peak=0;message="Starting microphone…";
     Feedback::suspend(true);
     if(Feedback::enabled()){M5.Speaker.tone(880,120);delay(160);}
     M5.Speaker.end();
@@ -111,18 +180,27 @@ bool start(){
     if(xTaskCreate(capture,"voice-capture",6144,nullptr,2,nullptr)!=pdPASS){running=false;Feedback::suspend(false);message="Cannot start recording task.";return false;}
     return true;
 }
-void stop(){if(active()){stopping=true;message="Stopping and saving…";}}
+void stop(){if(active()){stopping=true;message=playback?"Stopping playback…":"Stopping and saving…";}}
 void tick(){
-    if(!active())return;
+    if(!active()){
+        if(commands&&!Reader::busy()){
+            {Lock lock;if(!lock.held)return;}
+            Command cmd;if(xQueueReceive(commands,&cmd,0)==pdTRUE){
+                bool ok=cmd.path[0]?play(cmd.path):start();
+                if(!ok){Feedback::play(Feedback::Cue::Error);Reader::request(Reader::Action::VoiceStatus);}
+            }
+        }return;
+    }
     if(finished.load(std::memory_order_acquire)){
-        running=false;Feedback::suspend(false);Feedback::play(success?Feedback::Cue::Saved:Feedback::Cue::Error);return;
+        running=false;Feedback::suspend(false);Feedback::play(success?Feedback::Cue::Saved:Feedback::Cue::Error);
+        if(!success)Reader::request(Reader::Action::VoiceStatus);return;
     }
     if(millis()-powerAt>2000){powerAt=millis();if(M5.Power.getBatteryVoltage()<3400||M5.Power.getBatteryLevel()<10)stop();}
 }
 void routes(WebServer& s,const String& token){
     s.on("/voice",HTTP_GET,[&s,&token]{String html(VOICE_HTML);html.replace("{{TOKEN}}",token);s.sendHeader("Cache-Control","no-store");s.sendHeader("Content-Security-Policy","default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; media-src 'self'; frame-ancestors 'none'");s.send(200,"text/html",html);});
     s.on("/voice.js",HTTP_GET,[&s]{s.send_P(200,"text/javascript",VOICE_JS);});
-    s.on("/api/voice",HTTP_GET,[&s]{json(s,200,String("{\"active\":")+(active()?"true":"false")+",\"state\":\""+(active()?(stopping?"Saving":"Recording"):"Idle")+"\",\"seconds\":"+String(bytes.load()/32000)+",\"peak\":"+String(peak.load())+",\"message\":\""+message.load()+"\",\"path\":\""+path+"\"}");});
+    s.on("/api/voice",HTTP_GET,[&s]{json(s,200,String("{\"active\":")+(active()?"true":"false")+",\"state\":\""+(active()?(playback?(stopping?"Stopping":"Playing"):(stopping?"Saving":"Recording")):"Idle")+"\",\"seconds\":"+String(bytes.load()/32000)+",\"peak\":"+String(peak.load())+",\"message\":\""+message.load()+"\",\"path\":\""+path+"\"}");});
     s.on("/api/voice",HTTP_POST,[&s,&token]{
         if(s.header("X-Paper-Token")!=token){error(s,403,"Reload the page.");return;}
         if(s.arg("action")=="stop")stop();

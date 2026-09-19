@@ -3,7 +3,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-worker=Path('src/voice.cpp').read_text().split('void captureWork(){',1)[1].split('\nvoid json(',1)[0]
+worker=Path('src/voice.cpp').read_text().split('void captureWork(){',1)[1].split('\nvoid played(',1)[0]
 source=r'''
 #include "voice_format.h"
 #include <atomic>

@@ -16,4 +16,8 @@ inline bool path(const char* s){
     for(int i=36;i<44;++i)if(!((s[i]>='0'&&s[i]<='9')||(s[i]>='a'&&s[i]<='f')))return false;
     return true;
 }
+inline bool validHeader(const uint8_t* h,size_t size){
+    if(size<46||size>maxBytes+44||(size-44)%2)return false;
+    uint8_t expected[44];header(expected,size-44);return !memcmp(h,expected,44);
+}
 }

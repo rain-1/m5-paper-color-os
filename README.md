@@ -190,8 +190,9 @@ action in Voice notes or at `/voice`; it never starts automatically.
 Open `/voice` and choose **Use phone/computer time** once. The RTC and filenames
 use UTC; clock setup is remembered and restored on boot. No internet or phone
 app is needed. On the device, select the white **Voice notes** root item and wait
-for its instructions to appear. A starts capture; releasing any user button
-while recording stops and saves. C returns to the menu when idle; hold C still
+for its colour menu to appear. Red selects Record a note; yellow opens Saved
+recordings. A/B moves the LED, C or double-A chooses, double-B goes back.
+Releasing any user button while recording stops and saves. Hold C still
 unlocks OTA when not recording. The browser also offers start/stop controls.
 
 The microphone records 16 kHz, 16-bit mono WAV, about 1.92 MB/minute, for up to
@@ -204,7 +205,11 @@ guarantee against sudden power loss.
 
 Files live at `/recordings/YYYY/MM/YYYYMMDD_HHMMSS_random.wav`. Choose a month
 at `/voice` to see its newest 100 finished recordings, play them in the browser
-or download. On-device speaker playback is not implemented yet. Recordings are
+or download. On-device **Saved recordings** lists the newest 100 notes across
+all months, newest first, with UTC timestamps and More pages. Choose a note to
+play it through the speaker at moderate volume, without refreshing the screen.
+A dim blue blink indicates playback; any user-button release stops it. Playback
+does not start the microphone and works offline. Recordings are
 local but not encrypted: other people able to access the device on your network
 can access them. Do not expose it to the internet. Do not remove SD or power off
 during recording/saving. Interrupted/failed `.wav.part` files are kept for manual

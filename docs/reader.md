@@ -24,6 +24,11 @@ moving on-screen highlight. Both RGB LEDs show the selected row. Root menu:
 red Pictures, yellow Reader, green Library, blue Device information, white Voice notes.
 Reader opens Continue reading / Fonts / Bookmarks. Fonts opens Choose reading
 font / Font comparison sheet; Bookmarks opens Save / Recall.
+Voice notes opens red Record a note / yellow Saved recordings. Its dated saved
+note list uses the same selection colours and More pages. C or double-A starts
+speaker playback without a display refresh; any user-button release stops audio.
+Red blinking means capture; blue blinking means playback. Double-B returns to
+the parent menu when idle. Recording failures show a short on-screen explanation.
 
 In menus, single A/B moves up/down without scheduling any display refresh.
 Double A chooses; double B goes back. C also chooses immediately. A single tap

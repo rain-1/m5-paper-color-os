@@ -5,6 +5,7 @@
 #include <WebServer.h>
 #include <Preferences.h>
 #include <esp_system.h>
+#include <esp_wifi.h>
 #include "portal.h"
 #include "pictures.h"
 #include "device.h"
@@ -12,12 +13,23 @@
 #include "version.h"
 #include "reader.h"
 #include "refresh_test.h"
+#include "wifi_profiles.h"
 
 namespace {
 constexpr uint32_t CONNECT_TIMEOUT = 30000;
 constexpr uint32_t PORTAL_GRACE = 20000;
 const IPAddress PORTAL_IP(192, 168, 4, 1);
-struct Credentials { char ssid[33]; char password[64]; };
+using Credentials=WifiProfiles::Credentials;
+WifiProfiles::Store networks;
+bool scanning=false,automatic=false;
+uint8_t triedNetworks=0;
+int currentNetwork=-1,replaceNetwork=-1;
+int signalStrength[WifiProfiles::capacity];
+uint32_t scanStarted=0;
+void beginConnection(bool isTest);
+void startPortal();
+void scanSaved();
+void tryNextSaved();
 struct Screen { bool setup; char network[33]; char password[17]; char ip[16]; bool boot; char picture[64]; int battery; bool reader; };
 Preferences prefs;
 WebServer server(80);
@@ -145,12 +157,49 @@ void reply(int code, const String& body) {
 
 bool fromPortal() { return portal && server.client().localIP() == PORTAL_IP; }
 
+String escapeHtml(const String& value){
+    String out;for(unsigned i=0;i<value.length();++i){switch(value[i]){
+        case '&':out+="&amp;";break;case '<':out+="&lt;";break;case '>':out+="&gt;";break;
+        case '"':out+="&quot;";break;case '\'':out+="&#39;";break;default:out+=value[i];
+    }}return out;
+}
+bool persistNetworks(const WifiProfiles::Store& next){
+    if(!storageReady||prefs.putBytes("wifi5",&next,sizeof(next))!=sizeof(next))return false;
+    networks=next;prefs.remove("wifi");
+    // Invalidate old forms so a stale slot index cannot edit a different entry.
+    token=randomHex();return true;
+}
+String networkLabel(unsigned i){
+    const auto& e=networks.entries[i];
+    return escapeHtml(e.name[0]?String(e.name)+" ("+e.credentials.ssid+")":String(e.credentials.ssid));
+}
+void portalPage(){
+    String page(PORTAL_HTML),list,replace;
+    for(unsigned i=0;i<networks.count;++i){
+        String hidden="<input type='hidden' name='token' value='"+token+"'><input type='hidden' name='slot' value='"+String(i)+"'>";
+        list+="<section><h3>"+networkLabel(i)+(networks.last==i?" · last connected":"")+"</h3>";
+        list+="<form method='post' action='/wifi/rename'>"+hidden+"<label>Label<input name='name' maxlength='32' value='"+escapeHtml(networks.entries[i].name)+"'></label><button>Rename</button></form>";
+        list+="<form method='post' action='/wifi/forget'>"+hidden+"<label><input type='checkbox' name='confirm' value='yes' required> Confirm forget</label><button>Forget network</button></form></section>";
+    }
+    if(!networks.count)list="<p>No saved networks yet.</p>";
+    if(networks.count==WifiProfiles::capacity){
+        replace="<label>All five slots are full. For a new network, choose one to replace only after connection succeeds.<select name='replace'><option value=''>Choose if adding a new network</option>";
+        for(unsigned i=0;i<networks.count;++i)replace+="<option value='"+String(i)+"'>"+networkLabel(i)+"</option>";
+        replace+="</select></label>";
+    }
+    page.replace("{{REPLACE}}",replace);page.replace("{{NETWORKS}}",list);page.replace("{{TOKEN}}",token);reply(200,page);
+}
+bool allowNetworkEdit(){
+    if(!fromPortal()||server.arg("token")!=token){reply(403,"Reopen Wi-Fi setup.");return false;}
+    if(connecting||pendingConnect||saved){reply(409,"Wait for the connection attempt to finish.");return false;}
+    return true;
+}
+int networkSlot(const String& value){return value.length()==1&&value[0]>='0'&&value[0]<'0'+networks.count?value[0]-'0':-1;}
+
 void setupRoutes() {
     server.on("/", HTTP_GET, [] {
         if (!fromPortal()) { picturesPage(server); return; }
-        String page(PORTAL_HTML);
-        page.replace("{{TOKEN}}", token);
-        reply(200, page);
+        portalPage();
     });
     picturesRoutes(server, [](const char* path) {
         Reader::leave();
@@ -175,6 +224,8 @@ void setupRoutes() {
             reply(400, "Use a 1-32 byte network name and an 8-63 byte password (or empty for open Wi-Fi). <a href='/'>Back</a>");
             return;
         }
+        replaceNetwork=networkSlot(server.arg("replace"));
+        if(WifiProfiles::find(networks,ssid.c_str())<0&&networks.count==WifiProfiles::capacity&&replaceNetwork<0){reply(400,"Choose which saved network to replace. <a href='/'>Back</a>");return;}
         candidate = {};
         ssid.toCharArray(candidate.ssid, sizeof(candidate.ssid));
         password.toCharArray(candidate.password, sizeof(candidate.password));
@@ -182,6 +233,22 @@ void setupRoutes() {
         result = "Connecting... This can take 30 seconds. Stay on the setup Wi-Fi.";
         server.sendHeader("Location", "/status");
         reply(303, "Connecting. <a href='/status'>Check progress</a>");
+    });
+    server.on("/wifi/rename",HTTP_POST,[]{
+        if(!allowNetworkEdit())return;
+        int slot=networkSlot(server.arg("slot"));String name=server.arg("name");
+        if(slot<0||name.length()>32){reply(400,"Invalid slot or label.");return;}
+        auto next=networks;name.toCharArray(next.entries[slot].name,33);
+        if(!persistNetworks(next)){reply(503,"Could not save settings. Previous list kept.");return;}
+        server.sendHeader("Location","/");reply(303,"Saved. <a href='/'>Back</a>");
+    });
+    server.on("/wifi/forget",HTTP_POST,[]{
+        if(!allowNetworkEdit())return;
+        int slot=networkSlot(server.arg("slot"));
+        if(slot<0||server.arg("confirm")!="yes"){reply(400,"Confirm a valid network to forget.");return;}
+        auto next=networks;WifiProfiles::forget(next,slot);
+        if(!persistNetworks(next)){reply(503,"Could not save settings. Previous list kept.");return;}
+        server.sendHeader("Location","/");reply(303,"Forgotten. <a href='/'>Back</a>");
     });
     // Includes Android, Apple and Windows HTTP captive-portal probes.
     server.onNotFound([] {
@@ -193,6 +260,9 @@ void setupRoutes() {
 
 void startPortal() {
     if (portal) return;
+    if(scanning)esp_wifi_scan_stop();
+    automatic=scanning=false;WiFi.scanDelete();
+    pendingConnect=false;memset(&candidate,0,sizeof(candidate));
     WiFi.disconnect(false, false);
     connecting = testing = online = saved = false;
     portalCloseAt = 0;
@@ -220,6 +290,24 @@ void beginConnection(bool isTest) {
     connecting = true;
     online = false;
     connectStarted = millis();
+}
+void scanSaved(){
+    WiFi.disconnect(false,false);WiFi.scanDelete();
+    for(auto& r:signalStrength)r=-1000;
+    scanning=true;scanStarted=millis();WiFi.scanNetworks(true,true);
+}
+void tryNextSaved(){
+    currentNetwork=WifiProfiles::strongest(networks,signalStrength,triedNetworks);
+    if(currentNetwork<0){automatic=false;startPortal();return;}
+    triedNetworks|=1<<currentNetwork;candidate=networks.entries[currentNetwork].credentials;beginConnection(false);
+}
+void connectSaved(){
+    automatic=true;triedNetworks=0;currentNetwork=-1;
+    for(auto& r:signalStrength)r=-1000;
+    if(networks.last<networks.count){
+        currentNetwork=networks.last;triedNetworks|=1<<currentNetwork;
+        candidate=networks.entries[currentNetwork].credentials;beginConnection(false);
+    }else scanSaved();
 }
 } // namespace
 
@@ -256,15 +344,19 @@ void setup() {
     setupRoutes();
     server.begin();
     storageReady = prefs.begin("paper-os", false);
-    bool haveCredentials = storageReady && prefs.getBytesLength("wifi") == sizeof(candidate) &&
+    bool haveProfiles=storageReady&&prefs.getBytesLength("wifi5")==sizeof(networks)&&prefs.getBytes("wifi5",&networks,sizeof(networks))==sizeof(networks)&&WifiProfiles::valid(networks);
+    if(!haveProfiles)networks=WifiProfiles::Store{};
+    bool haveCredentials = !haveProfiles&&storageReady && prefs.getBytesLength("wifi") == sizeof(candidate) &&
                            prefs.getBytes("wifi", &candidate, sizeof(candidate)) == sizeof(candidate);
-    haveCredentials = haveCredentials && candidate.ssid[0] && candidate.ssid[32] == '\0' && candidate.password[63] == '\0';
+    haveCredentials = haveCredentials && WifiProfiles::validCredentials(candidate);
+    if(haveCredentials){WifiProfiles::save(networks,candidate);persistNetworks(networks);}
+    memset(&candidate,0,sizeof(candidate));
     M5.update();
-    if (haveCredentials && !M5.BtnB.isPressed()) {
+    if (networks.count && !M5.BtnB.isPressed()) {
         Screen splash{};
         splash.boot = true;
         xQueueOverwrite(screenQueue, &splash);
-        beginConnection(false);
+        connectSaved();
         Reader::resumeLast();
     }
     else startPortal();
@@ -304,12 +396,24 @@ void loop() {
     server.handleClient();
     if (pendingConnect) { pendingConnect = false; beginConnection(true); }
     uint32_t now = millis();
+    if(scanning){
+        int count=WiFi.scanComplete();
+        if(count!=WIFI_SCAN_RUNNING||now-scanStarted>=15000){
+            if(count==WIFI_SCAN_RUNNING)esp_wifi_scan_stop();
+            for(int i=0;i<count;++i){int slot=WifiProfiles::find(networks,WiFi.SSID(i).c_str());if(slot>=0)signalStrength[slot]=std::max(signalStrength[slot],int(WiFi.RSSI(i)));}
+            WiFi.scanDelete();scanning=false;tryNextSaved();
+        }
+    }
+    // A scan completion may just have started a new connection. Refresh now
+    // so unsigned timeout subtraction cannot underflow against connectStarted.
+    now=millis();
     if (connecting && WiFi.status() == WL_CONNECTED) {
         connecting = false;
         online = true;
         disconnectedAt = 0;
         if (testing) {
-            saved = storageReady && prefs.putBytes("wifi", &candidate, sizeof(candidate)) == sizeof(candidate);
+            auto next=networks;
+            saved = WifiProfiles::save(next,candidate,replaceNetwork)&&persistNetworks(next);
             memset(&candidate, 0, sizeof(candidate));
             if (saved) {
                 result = "Connected and saved. You can return to your normal Wi-Fi. The setup network closes shortly.";
@@ -318,7 +422,10 @@ void loop() {
             } else {
                 result = "Connected, but credentials could not be saved. Restart the device and try again.";
             }
-        } else { memset(&candidate, 0, sizeof(candidate)); showScreen(false); }
+        } else {
+            if(currentNetwork>=0&&networks.last!=currentNetwork){auto next=networks;next.last=currentNetwork;persistNetworks(next);}
+            automatic=false;memset(&candidate, 0, sizeof(candidate));showScreen(false);
+        }
         Serial.println("Wi-Fi connected");
         Feedback::play(Feedback::Cue::Connected);
         Serial.printf("Paper OS: http://%s/\n",WiFi.localIP().toString().c_str());
@@ -326,9 +433,12 @@ void loop() {
         connecting = false;
         WiFi.disconnect(false, false);
         memset(&candidate, 0, sizeof(candidate));
-        if (!portal) startPortal();
-        result = "Connection failed. Check the network name, password and 2.4 GHz signal, then try again. Previous saved credentials were kept.";
-        Feedback::play(Feedback::Cue::Error);
+        if(automatic){if(triedNetworks==(1<<currentNetwork)&&currentNetwork==networks.last)scanSaved();else tryNextSaved();}
+        else {
+            if (!portal) startPortal();
+            result = "Connection failed. Check the network name, password and 2.4 GHz signal, then try again. Previous saved credentials were kept.";
+            Feedback::play(Feedback::Cue::Error);
+        }
     }
     if (portal && portalCloseAt && int32_t(now - portalCloseAt) >= 0) {
         dns.stop(); WiFi.softAPdisconnect(true); WiFi.mode(WIFI_STA);
@@ -338,7 +448,7 @@ void loop() {
         if (!disconnectedAt) disconnectedAt = now;
         if (now - disconnectedAt >= CONNECT_TIMEOUT) {
             if (portal) { online = saved = false; portalCloseAt = 0; showScreen(true); }
-            else startPortal();
+            else {online=false;connectSaved();}
         }
     } else disconnectedAt = 0;
     delay(2);

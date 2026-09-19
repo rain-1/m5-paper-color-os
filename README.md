@@ -54,12 +54,26 @@ part of this milestone. Network names are entered manually, including hidden SSI
 No internet or cloud account is required. Successful connection means a Wi-Fi
 association with an assigned IP address, not a check of internet availability.
 
-On subsequent boots, a splash appears while connecting. Failure after 30 seconds
-opens setup. Hold the **lower-left button (B)** for 2.5 seconds to reopen setup, or hold
-it during boot to skip the saved network. Failed replacement credentials do not
-overwrite the previous working configuration. Sustained connection loss also
-opens setup. The display updates only on state changes; HTTP/DNS continue on a
-separate task from display refreshes.
+Up to five networks are saved in internal NVS (no SD needed). Existing single-network
+credentials migrate automatically. On boot, try the last successful network for
+up to 30 seconds, then scan and try other visible saved networks in strongest-signal
+order (30 seconds per attempt). If none work, setup opens. A sustained 30-second
+connection loss triggers the same selection process; it does not roam away from
+a working network merely because another has a stronger signal. Hidden networks
+can be entered manually and retried as the last successful network; hidden SSIDs
+not returned by a scan cannot be selected during scanned fallback.
+
+Hold **B** (the lower of the two left user buttons) for 2.5 seconds to reopen setup,
+or hold it at boot to skip automatic connections. The setup page lets you rename
+labels and forget saved networks. At five entries, adding a new SSID requires an
+explicit replacement choice; updating an existing SSID preserves its label. Only
+a successful connection and NVS write publish changes. Failed attempts preserve
+the previous list. Network management is available only through the setup hotspot
+with its session token; passwords are never returned in HTML. Changing the list
+invalidates older forms. After fallback to setup, restart to retry saved networks
+or enter credentials manually. HTTP/DNS remain responsive during scans and display
+refreshes. Downgrading to pre-0.10 firmware requires re-entering Wi-Fi credentials
+unless restoring a complete old flash backup.
 
 ## Pictures, device lab and wireless updates
 

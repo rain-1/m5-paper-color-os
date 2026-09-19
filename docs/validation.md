@@ -120,6 +120,19 @@ can be considered implemented on hardware. Audible cues remain independent.
 - Accelerated transitions between the new full-page patterns await user testing;
   no claim of visual quality is made from timing/status telemetry alone.
 
+## 0.10.0 five Wi-Fi profiles — host verified, pending installation
+
+- Firmware build passed (1,161,737-byte application); converter regression passes.
+- ASan/UBSan profile tests cover the legacy 97-byte credential layout, migration
+  into the versioned store, five-slot limit, explicit replacement, in-place password
+  updates preserving labels, forgetting/last-index adjustment, malformed records,
+  duplicate SSIDs and strongest-untried-visible selection.
+- Reviewed asynchronous scan/connection transitions, scan cancellation, refreshed
+  timeout timestamp, bounded attempt set, and setup-hotspot/token gating of edits.
+- Migration on actual NVS, real multi-access-point failover, full-list management
+  and captive-browser rendering still require device testing after installation.
+- No Wi-Fi settings changed on the running device during host development.
+
 ## 0.9.1 prepared-picture dithering fix — host verified, pending installation
 
 - Shared SD/RAM picture branch now selects no-dither conversion for transfer,

@@ -5,6 +5,16 @@ compatibility, minor changes add features, patch changes fix or refine behaviour
 The current API and device screen use the same version. Release binaries are
 application images for the existing 16 MB partition layout.
 
+## 0.10.0
+
+- Five Wi-Fi profiles in versioned internal NVS, with migration of the old single
+  profile. Last-successful-first connection, then asynchronous scan and strongest
+  visible saved-network fallback on boot or sustained disconnection.
+- Setup-hotspot controls for labels, confirmed forgetting and explicit replacement
+  when full. Existing SSIDs update in place; failed credentials preserve the list.
+- Passwords are not rendered; profile edits require hotspot access and a session
+  token. Successful edits invalidate stale forms. No display timing changes.
+
 ## 0.9.1
 
 - Disable device-side dithering for prepared pictures (SD and RAM-only). Browser

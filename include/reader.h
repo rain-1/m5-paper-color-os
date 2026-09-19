@@ -11,6 +11,7 @@ bool busy();
 // -1 outside an idle menu; otherwise fixed colour row 0..4.
 int menuSelection();
 bool menuPicking();
+bool voiceControls();
 void leave();
 void resumeLast();
 // The display task owns reader rendering/state and holds pictureBus for both.

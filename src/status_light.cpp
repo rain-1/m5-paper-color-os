@@ -1,5 +1,6 @@
 #include "status_light.h"
 #include "menu_input.h"
+#include "voice.h"
 #include <M5Unified.h>
 #include <esp32-hal-rmt.h>
 namespace StatusLight {
@@ -31,6 +32,7 @@ bool ready(){return output!=nullptr;}
 void flash(uint32_t c,uint32_t duration,int index){colour=c;until=millis()+duration;led=index;}
 void menuActivity(){menuTimer.touch(millis());}
 void tick(int selection){
+    if(Voice::active()){write(millis()%1000<140?0x400000:0,0);return;}
     bool lit=menuTimer.visible(selection,millis());
     if(selection>=0&&selection<5){auto c=lit?MenuInput::colours[selection]:0;write(c,c);return;}
     if(until&&int32_t(millis()-until)<0)write(led==1?0:colour,led==0?0:colour);

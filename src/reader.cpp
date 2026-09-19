@@ -8,6 +8,7 @@
 #include "refresh_test.h"
 #include "menu_input.h"
 #include "status_light.h"
+#include "voice.h"
 #include <SD.h>
 #include <Preferences.h>
 #include <WiFi.h>
@@ -15,7 +16,7 @@
 
 namespace Reader {
 namespace {
-enum class View { Menu, Library, Reading, Fonts, Sampler, Info, FontMenu, Bookmarks, ReaderMenu, PictureMonths, Pictures, Picture };
+enum class View { Menu, Library, Reading, Fonts, Sampler, Info, FontMenu, Bookmarks, ReaderMenu, PictureMonths, Pictures, Picture, VoiceNotes };
 bool listView(View v){return v==View::Menu||v==View::Library||v==View::Fonts||v==View::FontMenu||v==View::Bookmarks||v==View::ReaderMenu||v==View::PictureMonths||v==View::Pictures;}
 struct Book { String id,title; uint32_t size; };
 struct Progress { uint32_t magic=0x42524b31, offset=0, bookmark=UINT32_MAX; };
@@ -37,7 +38,7 @@ const FontChoice fontChoices[]={
     {&fonts::FreeMono12pt7b,"Typewriter / 12 pt"}
 };
 constexpr unsigned fontCount=sizeof(fontChoices)/sizeof(fontChoices[0]);
-const char* menuItems[]={"Pictures","Reader","Library","Device information"};
+const char* menuItems[]={"Pictures","Reader","Library","Device information","Voice notes"};
 Preferences settings;
 SemaphoreHandle_t stateMutex;
 Snapshot snapshot;
@@ -195,10 +196,11 @@ bool active(){return stateMutex && state().active;}
 bool busy(){return stateMutex && state().busy;}
 int menuSelection(){if(!stateMutex)return -1;auto s=state();return s.active&&!s.busy&&listView(s.view)&&s.count?int(s.selection):-1;}
 bool menuPicking(){if(!stateMutex)return false;auto s=state();return s.active&&!s.busy&&listView(s.view);}
+bool voiceControls(){if(!stateMutex)return false;auto s=state();return s.active&&!s.busy&&s.view==View::VoiceNotes;}
 void leave(){if(!stateMutex)return;xSemaphoreTake(stateMutex,portMAX_DELAY);snapshot.active=false;xSemaphoreGive(stateMutex);}
 void resumeLast(){if(!lastId.isEmpty())request(Action::Resume);}
 bool request(Action action,const char* id,uint32_t value){
-    if(!stateMutex||!scheduleScreen||RefreshTest::faulted())return false;
+    if(!stateMutex||!scheduleScreen||RefreshTest::faulted()||Voice::active())return false;
     xSemaphoreTake(stateMutex,portMAX_DELAY);
     if(snapshot.busy){xSemaphoreGive(stateMutex);return false;}
     if(snapshot.active&&listView(snapshot.view)&&(action==Action::Previous||action==Action::Next)){
@@ -302,6 +304,7 @@ bool render(M5Canvas& canvas,int battery){
                     case 1:view=View::ReaderMenu;selection=listPage=0;break;
                     case 2:scanLibrary();view=View::Library;selection=listPage=0;break;
                     case 3:view=View::Info;break;
+                    case 4:view=View::VoiceNotes;break;
                 }
             }
             break;
@@ -323,6 +326,17 @@ bool render(M5Canvas& canvas,int battery){
         heading(canvas,"Type on paper");
         for(unsigned i=0;i<fontCount;++i){int y=86+i*89;canvas.setFont(&fonts::Font2);canvas.drawString(fontChoices[i].label,24,y);canvas.setFont(fontChoices[i].font);canvas.drawString("A quiet morning.",24,y+23);}
         footer(canvas,"C: menu / Choose Reading font");
+    }else if(view==View::VoiceNotes){
+        heading(canvas,"Voice notes");canvas.setFont(&fonts::FreeSans12pt7b);
+        canvas.drawString("A: start recording",24,112);
+        canvas.drawString("Any button: stop & save",24,163);
+        canvas.setFont(&fonts::Font2);
+        canvas.drawString("Blinking red LED = recording",24,230);
+        canvas.drawString("Rising beep = saved / falling = failed",24,267);
+        canvas.drawString("Five-minute limit. Keep SD inserted.",24,304);
+        canvas.drawString("Do not power off while recording.",24,341);
+        canvas.drawString("Set clock, listen and download at /voice",24,410);
+        footer(canvas,"C: menu (when not recording)");
     }else if(view==View::Info){
         heading(canvas,"Paper OS");canvas.setFont(&fonts::FreeSans12pt7b);
         canvas.drawString(String("Version ")+PAPER_OS_VERSION,24,105);canvas.drawString(String("Battery ")+battery+"%",24,156);
@@ -360,7 +374,7 @@ void routes(WebServer& server,const String& token){
         String body=String("{\"active\":")+(s.active?"true":"false")+",\"busy\":"+(s.busy?"true":"false");
         body+=",\"id\":\""+String(s.id)+"\",\"title\":\""+escaped(s.title)+"\",\"message\":\""+escaped(s.message)+"\"";
         body+=",\"page\":"+String(s.page)+",\"pages\":"+String(s.pages)+",\"offset\":"+String(s.offset)+",\"font\":"+String(s.font)+",\"hasBookmark\":"+(s.bookmark==UINT32_MAX?"false":"true")+"}";
-        const char* views[]={"menu","library","reading","fonts","sampler","info","font-menu","bookmarks","reader-menu","picture-months","pictures","picture"};
+        const char* views[]={"menu","library","reading","fonts","sampler","info","font-menu","bookmarks","reader-menu","picture-months","pictures","picture","voice-notes"};
         body.remove(body.length()-1);body+=",\"view\":\""+String(views[unsigned(s.view)])+"\",\"selection\":"+String(s.selection)+",\"menuCount\":"+String(s.count)+"}";
         server.sendHeader("Cache-Control","no-store");server.send(200,"application/json",body);
     });

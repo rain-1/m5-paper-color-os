@@ -120,7 +120,23 @@ can be considered implemented on hardware. Audible cues remain independent.
 - Accelerated transitions between the new full-page patterns await user testing;
   no claim of visual quality is made from timing/status telemetry alone.
 
-## 0.12.0 picture menus and LED idle-off — host verified, pending installation
+## 0.13.0 voice notes — host checks, hardware acceptance pending
+
+- Firmware builds against pinned libraries. Actual capture worker exercised with
+  fake SD/microphone: explicit stop, five-minute cap, missing/full SD, directory,
+  microphone/queue/write/header/rename failures, partial retention and cleanup.
+- ASan/UBSan WAV header/path tests; dispatcher rejects screen work while recording.
+- Chromium uses actual embedded voice HTML/JS for start/stop, token headers,
+  clock request, lazy audio/download links and mobile layout. Existing converter,
+  reader, picture-browser and menu regressions run separately.
+- Still needs hardware: microphone startup/quality/continuity, real WAV playback,
+  low-power stopping, RTC persistence and power-off/wake. No microphone recording
+  or power-off is triggered by these host tests. No panel timing changes.
+
+## 0.12.0 picture menus and LED idle-off — host verified, installed
+
+- OTA accepted and `/api/device` reported 0.12.0, `ledReady: true` and OTA locked.
+  Physical menu/LED behaviour remains user acceptance, not proven by telemetry.
 
 - Firmware build and host menu dispatcher tests cover the additional reader,
   picture-month and picture-list menus. Selection moves schedule no screen work.

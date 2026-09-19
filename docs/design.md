@@ -13,9 +13,9 @@ and [SD example](https://docs.m5stack.com/en/arduino/papercolor/microsd).
 | Power/reset/download button | Board power system | Hardware-managed restart, off and USB download |
 | Two RGB LEDs | GPIO 21, PMIC power | Bounded lab tests; later transient status feedback |
 | 1 W speaker, ES8311 codec, AW8737A amp | I2S; amp enable 46, audio power 45 | Short tone test; later notifications; no separate beeper listed |
-| MEMS mic, ES7210 ADC, AEC hardware | I2S + I2C | Later explicit recording/level tests; currently disabled |
+| MEMS mic, ES7210 ADC, AEC hardware | I2S + I2C | Explicit SD WAV voice notes and peak meter; no background listening |
 | SHT40 temperature/humidity | I2C 0x44 | CRC-checked readings every ten seconds |
-| RX8130CE RTC | I2C 0x32, IRQ 7 | Read-only lab view; later time sync and scheduled wakes |
+| RX8130CE RTC | I2C 0x32, IRQ 7 | Explicit browser UTC sync; scheduled wake still future work |
 | microSD | SPI CLK 15, MOSI 13, MISO 14, CS 47 | FAT32 dated pictures; display/SD mutex |
 | IR emitter | GPIO 48 | Later explicit transmit tests, no unsolicited transmissions |
 | Grove HY2.0-4P | GPIO 4/5, 5 V, ground | Later identified accessory drivers |

@@ -5,6 +5,18 @@ compatibility, minor changes add features, patch changes fix or refine behaviour
 The current API and device screen use the same version. Release binaries are
 application images for the existing 16 MB partition layout.
 
+## 0.13.0
+
+- Voice notes (white, fifth root item): A starts; any user-button release stops.
+  No display refresh while recording. A dim red blink indicates active capture.
+- 16 kHz / 16-bit mono WAV on SD, UTC month directories, five-minute limit,
+  low-power/free-space checks, explicit stop/save and retained partial files.
+- `/voice`: start/stop, status/peak, month browser and browser playback/download.
+  Microphone capture runs in a worker; SD/display work and OTA are excluded.
+- Explicit browser clock synchronisation, RTC readback and persisted setup flag.
+- `/device`: guarded manual Sleep / power off, waking with the side power button.
+  Automatic sleep and scheduled wakes are not enabled. Panel timing unchanged.
+
 ## 0.12.0
 
 - Four-item root: Pictures (red), Reader (yellow), Library (green), Device

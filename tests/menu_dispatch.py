@@ -21,6 +21,7 @@ void xSemaphoreTake(int,int){} void xSemaphoreGive(int){}
 void schedule(){++scheduled;} void (*scheduleScreen)()=schedule;
 namespace RefreshTest {bool fault=false;bool faulted(){return fault;}}
 namespace StatusLight {void menuActivity(){}}
+namespace Voice {bool recording=false;bool active(){return recording;}}
 bool request(Action action''' + request + r'''
 int main(){
   for(auto v:{View::Menu,View::Library,View::Fonts,View::FontMenu,View::Bookmarks,View::ReaderMenu,View::PictureMonths,View::Pictures}){
@@ -35,6 +36,7 @@ int main(){
   snapshot.busy=false;snapshot.view=View::Menu;snapshot.count=0;scheduled=0;
   assert(request(Action::Next,"",0));assert(!scheduled);
   assert(request(Action::Back,"",0));assert(scheduled==1);
+  snapshot.busy=false;Voice::recording=true;assert(!request(Action::Next,"",0));Voice::recording=false;
   snapshot.busy=false;RefreshTest::fault=true;assert(!request(Action::Next,"",0));
   puts("Actual reader dispatcher: menu moves schedule zero screen updates; choose/back/page turns schedule; busy/fault guards passed.");
 }

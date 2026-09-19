@@ -7,6 +7,9 @@
 #include "version.h"
 #include "ota_power.h"
 #include "refresh_test.h"
+#include "voice.h"
+#include "paper_clock.h"
+#include <SD.h>
 #include <M5Unified.h>
 #include <WiFi.h>
 #include <Update.h>
@@ -66,6 +69,7 @@ void readEnvironment(){
 }
 
 void deviceTick(){
+    if(Voice::active()){cHandled=true;return;}
     if(M5.BtnA.wasPressed())counts[0]++;
     if(M5.BtnB.wasPressed())counts[1]++;
     if(M5.BtnC.wasPressed())counts[2]++;
@@ -81,6 +85,19 @@ void deviceTick(){
 }
 
 void deviceRoutes(WebServer& s,const String& token){
+    Voice::routes(s,token);
+    PaperClock::routes(s,token);
+    s.on("/api/sleep",HTTP_POST,[&s,&token]{
+        if(s.header("X-Paper-Token")!=token){s.send(403,"application/json","{\"error\":\"Reload the page.\"}");return;}
+        if(Voice::active()||Reader::busy()||updateStarted||restartAt||xSemaphoreTake(pictureBus,0)!=pdTRUE){s.send(409,"application/json","{\"error\":\"Finish recording, updating and screen/SD work before sleeping.\"}");return;}
+        // Main task owns this lock through shutdown: no worker can touch SD or display.
+        s.send(200,"application/json","{\"ok\":true}");delay(250);
+        Feedback::suspend(true);StatusLight::flash(0,0);StatusLight::tick(-1);
+        M5.Mic.end();M5.Speaker.end();digitalWrite(45,LOW);
+        SD.end();WiFi.disconnect(true,false);M5.Power.powerOff();
+        // The driver normally never returns. If it does, reboot to remount SD.
+        ESP.restart();
+    });
     RefreshTest::routes(s,token);
     s.on("/device",HTTP_GET,[&s,&token]{String page(DEVICE_HTML);page.replace("{{TOKEN}}",token);s.sendHeader("Cache-Control","no-store");s.sendHeader("Content-Security-Policy","default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'");s.send(200,"text/html",page);});
     s.on("/device.js",HTTP_GET,[&s]{s.send_P(200,"text/javascript",DEVICE_JS);});
@@ -99,10 +116,12 @@ void deviceRoutes(WebServer& s,const String& token){
         body+=",\"heap\":"+String(ESP.getFreeHeap())+",\"psram\":"+String(ESP.getFreePsram())+",\"uptime\":"+String(millis()/1000);
         body+=",\"resetReason\":\""+String(resetReason())+"\"";
         body+=",\"temperature\":"+(isnan(temperature)?String("null"):String(temperature,1))+",\"humidity\":"+(isnan(humidity)?String("null"):String(humidity,1));
+        body+=String(",\"clockSet\":")+(PaperClock::ready()?"true":"false");
         body+=",\"rtc\":\""+String(rtcOk?date:"unavailable")+"\",\"otaSeconds\":"+String(otaSeconds())+"}";
         s.sendHeader("Cache-Control","no-store");s.send(200,"application/json",body);
     });
     s.on("/api/feedback",HTTP_POST,[&s,&token]{
+        if(Voice::active()){s.send(409,"application/json","{\"error\":\"Stop recording before changing audio.\"}");return;}
         if(s.header("X-Paper-Token")!=token){s.send(403,"application/json","{\"error\":\"Reload the page.\"}");return;}
         if(s.hasArg("enabled"))Feedback::setEnabled(s.arg("enabled")=="true");
         else{
@@ -117,6 +136,7 @@ void deviceRoutes(WebServer& s,const String& token){
         s.send(200,"application/json","{\"ok\":true}");
     });
     s.on("/api/test",HTTP_POST,[&s,&token]{
+        if(Voice::active()){s.send(409,"application/json","{\"error\":\"Stop recording before hardware tests.\"}");return;}
         if(s.header("X-Paper-Token")!=token){s.send(403,"application/json","{\"error\":\"Reload the page.\"}");return;}
         String action=s.arg("action");
         if(action=="tone"){
@@ -151,7 +171,7 @@ void deviceRoutes(WebServer& s,const String& token){
             String size=s.arg("size");expected=0;
             for(size_t i=0;i<size.length();i++){if(size[i]<'0'||size[i]>'9'||expected>0x640000){expected=0;break;}expected=expected*10+size[i]-'0';}
             const esp_partition_t* next=esp_ota_get_next_update_partition(nullptr);
-            if(duplicate||s.header("X-Paper-Token")!=token||!otaSeconds()||!next||expected<1024||expected>next->size){updateError="Rejected";return;}
+            if(Voice::active()||duplicate||s.header("X-Paper-Token")!=token||!otaSeconds()||!next||expected<1024||expected>next->size){updateError="Rejected";return;}
             updateLock=xSemaphoreTake(pictureBus,0)==pdTRUE;
             if(!updateLock){updateError="Screen busy";return;}
             if(!stablePower()){powerRejected=true;updateError="Unsafe power";abortUpdate();return;}

@@ -16,6 +16,8 @@
 #include "wifi_profiles.h"
 #include "menu_input.h"
 #include "status_light.h"
+#include "voice.h"
+#include "paper_clock.h"
 
 namespace {
 constexpr uint32_t CONNECT_TIMEOUT = 30000;
@@ -317,13 +319,15 @@ void setup() {
     auto cfg = M5.config();
     cfg.clear_display = false;
     cfg.internal_spk = true;
-    cfg.internal_mic = false;
+    cfg.internal_mic = true;
     M5.begin(cfg);
     Serial.begin(115200);
     M5.Display.setRotation(0);
     M5.Display.setEpdMode(epd_mode_t::epd_quality);
     picturesBegin();
     Feedback::begin();
+    PaperClock::begin();
+    Voice::begin();
     if (!pictureBus) { Serial.println("SPI mutex allocation failed"); while(true) delay(1000); }
     screenQueue = xQueueCreate(1, sizeof(Screen));
     Reader::begin([] {
@@ -366,8 +370,14 @@ void setup() {
 
 void loop() {
     M5.update();
+    bool wasRecording=Voice::active();
+    Voice::tick();
     static bool aLong=false,bLong=false,cLong=false;
     static MenuInput::Clicks clicks;
+    if(wasRecording&&!Voice::active()){
+        clicks.clear();aLong=M5.BtnA.isPressed()||M5.BtnA.wasReleased();
+        bLong=M5.BtnB.isPressed()||M5.BtnB.wasReleased();cLong=M5.BtnC.isPressed()||M5.BtnC.wasReleased();
+    }
     auto readerAction=[](Reader::Action action) {
         if (!Reader::request(action)) Feedback::play(Feedback::Cue::Busy);
     };
@@ -380,6 +390,18 @@ void loop() {
             default:break;
         }
     };
+    if(Voice::active()){
+        clicks.clear();aLong=bLong=cLong=true;
+        if(M5.BtnA.wasReleased()||M5.BtnB.wasReleased()||M5.BtnC.wasReleased())Voice::stop();
+    }else if(Reader::voiceControls()){
+        clicks.clear();
+        if(M5.BtnC.pressedFor(2500))cLong=true;
+        if(M5.BtnA.wasReleased()&&!aLong){if(!Voice::start())Feedback::play(Feedback::Cue::Error);}
+        if(M5.BtnC.wasReleased()&&!cLong)readerAction(Reader::Action::Menu);
+        if(!M5.BtnA.isPressed())aLong=false;
+        if(!M5.BtnB.isPressed())bLong=false;
+        if(!M5.BtnC.isPressed())cLong=false;
+    }else{
     if(!Reader::menuPicking())clicks.clear();
     else if(M5.BtnA.wasPressed()||M5.BtnB.wasPressed()||M5.BtnC.wasPressed())StatusLight::menuActivity();
     if (M5.BtnA.pressedFor(2500) && !aLong) {
@@ -392,9 +414,6 @@ void loop() {
         else { Reader::leave(); if (portal) showScreen(true); else startPortal(); }
     }
     if (M5.BtnC.pressedFor(2500)) cLong=true;
-    deviceTick();
-    Feedback::tick();
-    StatusLight::tick(Reader::menuSelection());
     if (M5.BtnA.wasReleased()) {
         if (!aLong) { if(Reader::menuPicking())menuEvent(clicks.release(0,millis()));else if (Reader::active()) readerAction(Reader::Action::Previous); else showScreen(portal); }
         aLong=false;
@@ -409,6 +428,10 @@ void loop() {
         cLong=false;
     }
     if(Reader::menuPicking()&&!M5.BtnA.isPressed()&&!M5.BtnB.isPressed())menuEvent(clicks.tick(millis()));
+    }
+    deviceTick();
+    Feedback::tick();
+    StatusLight::tick(Reader::menuSelection());
     if (portal) dns.processNextRequest();
     server.handleClient();
     if (pendingConnect) { pendingConnect = false; beginConnection(true); }

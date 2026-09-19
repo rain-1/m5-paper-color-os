@@ -19,6 +19,7 @@ const Motif motifs[] = {
 Preferences settings;
 QueueHandle_t queue=nullptr;
 bool audible=true, storage=false, active=false;
+bool suspended=false;
 Cue current=Cue::Connected;
 uint8_t nextNote=0;
 uint32_t nextAt=0;
@@ -37,7 +38,9 @@ void setEnabled(bool value){
     if(storage)settings.putBool("sounds",value);
 }
 void play(Cue cue){if(queue)xQueueOverwrite(queue,&cue);}
+void suspend(bool value){suspended=value;active=false;if(queue)xQueueReset(queue);M5.Speaker.stop();}
 void tick(){
+    if(suspended)return;
     uint32_t now=millis();
     Cue incoming;
     if(queue && xQueueReceive(queue,&incoming,0)==pdTRUE){
@@ -53,5 +56,8 @@ void tick(){
         nextAt=now+note.duration+65;
         active=nextNote<motif.count;
     }
+    // PaperColor's speaker callback also switches off the shared codec/mic
+    // power rail. Capture suspends this tick before it owns that rail.
+    if(!active&&!M5.Speaker.isPlaying()&&M5.Speaker.isRunning())M5.Speaker.end();
 }
 }

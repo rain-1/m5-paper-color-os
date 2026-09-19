@@ -88,7 +88,7 @@ changes only the LED (350 ms double-tap window); double A chooses and double B
 goes back. C remains an immediate choose shortcut. Only choosing/back or explicit
 More-page selection refreshes the menu. Startup shows the menu rather than
 automatically opening the last book; Continue reading restores your place.
-The root is **Pictures / Reader / Library / Device information**. Reader contains
+The root is **Pictures / Reader / Library / Device information / Voice notes**. Reader contains
 Continue reading, Fonts and Bookmarks. Menu LEDs turn off after 30 seconds idle;
 a menu button wakes them without changing the stored selection on key-down.
 Normal tap actions still apply. This does not put the whole device to sleep.
@@ -182,7 +182,38 @@ After unlocking C, the development machine can also upload with:
 
 The device lab shows battery estimate/voltage/charging, button press counts,
 temperature/humidity, RTC, Wi-Fi and free memory. LED tests last five seconds;
-the speaker tone lasts 200 ms at low volume. It does not record microphone audio.
+the speaker tone lasts 200 ms at low volume. Recording starts only by explicit
+action in Voice notes or at `/voice`; it never starts automatically.
+
+### Voice notes, clock and sleep (0.13)
+
+Open `/voice` and choose **Use phone/computer time** once. The RTC and filenames
+use UTC; clock setup is remembered and restored on boot. No internet or phone
+app is needed. On the device, select the white **Voice notes** root item and wait
+for its instructions to appear. A starts capture; releasing any user button
+while recording stops and saves. C returns to the menu when idle; hold C still
+unlocks OTA when not recording. The browser also offers start/stop controls.
+
+The microphone records 16 kHz, 16-bit mono WAV, about 1.92 MB/minute, for up to
+five minutes. A dim red LED blinks during capture; no screen refresh occurs.
+Normal event sounds are suspended; start and save/error cues resume at the
+boundaries (unless sounds are muted). Capture blocks other SD/display activity,
+OTA and hardware audio tests. Need at least 10 MB free, 15% battery and 3.5 V to
+start; capture stops below 10% or 3.4 V. These readings are estimates, not a
+guarantee against sudden power loss.
+
+Files live at `/recordings/YYYY/MM/YYYYMMDD_HHMMSS_random.wav`. Choose a month
+at `/voice` to see its newest 100 finished recordings, play them in the browser
+or download. On-device speaker playback is not implemented yet. Recordings are
+local but not encrypted: other people able to access the device on your network
+can access them. Do not expose it to the internet. Do not remove SD or power off
+during recording/saving. Interrupted/failed `.wav.part` files are kept for manual
+recovery; they may have an incomplete WAV header and are not listed as finished.
+
+`/device` has a confirmed **Sleep / power off** action, refused while recording,
+updating or working on SD/display. The image remains, Wi-Fi goes offline, and
+the side power button starts it again. This uses board power-off; no automatic
+sleep, timed wake or measured battery-life claim is included in this release.
 Event sounds can be muted persistently and previewed in the lab. See the
 [sound and light language](docs/feedback.md) and [firmware changelog](CHANGELOG.md).
 

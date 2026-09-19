@@ -21,7 +21,7 @@ a screen refresh; the saved sound confirms it. Sounds can be muted in `/device`.
 
 Menus are fixed coloured blocks with a colour name and row number; there is no
 moving on-screen highlight. Both RGB LEDs show the selected row. Root menu:
-red Pictures, yellow Reader, green Library, blue Device information.
+red Pictures, yellow Reader, green Library, blue Device information, white Voice notes.
 Reader opens Continue reading / Fonts / Bookmarks. Fonts opens Choose reading
 font / Font comparison sheet; Bookmarks opens Save / Recall.
 

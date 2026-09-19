@@ -150,7 +150,7 @@ void drawList(M5Canvas& c,const char* title,const std::vector<String>& rows){
     for(unsigned i=0;i<listCount;++i){
         int y=90+i*83;auto bg=MenuInput::colours[i];
         c.fillRoundRect(18,y,364,73,5,bg);c.drawRoundRect(18,y,364,73,5,BLACK);
-        c.setTextColor(i==3?WHITE:BLACK,bg);
+        c.setTextColor((i==0||i==3)?WHITE:BLACK,bg);
         c.setFont(&fonts::Font2);c.drawString(String(i+1)+" / "+MenuInput::names[i],30,y+5);
         c.setFont(&fonts::FreeSans12pt7b);
         c.drawString(fit(c,i<visible?rows[start+i]:String("More books (next page)"),338),30,y+31);

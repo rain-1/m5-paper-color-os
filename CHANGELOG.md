@@ -5,6 +5,12 @@ compatibility, minor changes add features, patch changes fix or refine behaviour
 The current API and device screen use the same version. Release binaries are
 application images for the existing 16 MB partition layout.
 
+## 0.11.1
+
+- Use white labels and text on solid red menu blocks for better readability,
+  following the physical colour comparison. Blue also retains white text;
+  yellow, green and white retain black text. No panel timing changes.
+
 ## 0.11.0
 
 - Fixed five-colour menu blocks with matching LED selection; menu up/down never

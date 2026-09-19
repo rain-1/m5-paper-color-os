@@ -2,6 +2,8 @@
 #include "device_page.h"
 #include "pictures.h"
 #include "feedback.h"
+#include "status_light.h"
+#include "reader.h"
 #include "version.h"
 #include "ota_power.h"
 #include "refresh_test.h"
@@ -11,7 +13,7 @@
 #include <esp_ota_ops.h>
 
 namespace {
-uint32_t counts[3]{}, unlockedUntil=0, ledUntil=0, restartAt=0;
+uint32_t counts[3]{}, unlockedUntil=0, restartAt=0;
 bool cHandled=false, updateStarted=false, updateComplete=false, updateLock=false;
 size_t expected=0, received=0;
 String updateError;
@@ -73,7 +75,6 @@ void deviceTick(){
         Feedback::play(Feedback::Cue::Unlocked);
         Serial.println("OTA unlocked for 120 seconds");
     }
-    if(ledUntil && int32_t(millis()-ledUntil)>=0){M5.Led.setAllColor(0,0,0);ledUntil=0;}
     if(updateStarted && millis()-lastChunk>15000){abortUpdate();updateError="Upload timed out";}
     if(restartAt && int32_t(millis()-restartAt)>=0)ESP.restart();
     if(!updateStarted && millis()-sensorAt>10000){sensorAt=millis();readEnvironment();}
@@ -91,6 +92,7 @@ void deviceRoutes(WebServer& s,const String& token){
         String body=String("{\"version\":\"")+PAPER_OS_VERSION+"\",\"battery\":"+String(battery)+",\"millivolts\":"+String(batteryMv);
         body+=",\"inputMillivolts\":"+String(inputMv)+",\"otaPowerOk\":"+(OtaPower::allowed(inputMv,batteryMv,battery)?String("true"):String("false"));
         body+=String(",\"sounds\":")+(Feedback::enabled()?"true":"false");
+        body+=String(",\"ledReady\":")+(StatusLight::ready()?"true":"false");
         body+=",\"charging\":\""+String(charging==m5::Power_Class::is_charging ? "yes" : charging==m5::Power_Class::is_discharging ? "no" : "unknown")+"\"";
         body+=",\"ip\":\""+WiFi.localIP().toString()+"\",\"rssi\":"+String(WiFi.RSSI());
         body+=",\"buttons\":["+String(counts[0])+","+String(counts[1])+","+String(counts[2])+"]";
@@ -121,10 +123,9 @@ void deviceRoutes(WebServer& s,const String& token){
             M5.Speaker.setVolume(48);
             if(!M5.Speaker.tone(880,200)){s.send(503,"application/json","{\"error\":\"Speaker test failed to start.\"}");return;}
         }else if(action=="led0"||action=="led1"||action=="off"){
-            M5.Led.setBrightness(40);M5.Led.setAllColor(0,0,0);
-            if(action=="led0")M5.Led.setColor(0,255,0,0);
-            if(action=="led1")M5.Led.setColor(1,0,0,255);
-            ledUntil=millis()+5000;
+            if(!StatusLight::ready()){s.send(503,"application/json","{\"error\":\"LED driver unavailable\"}");return;}
+            if(Reader::menuPicking()){s.send(409,"application/json","{\"error\":\"Exit the menu before testing LEDs\"}");return;}
+            StatusLight::flash(action=="led0"?0xff0000:action=="led1"?0x0000ff:0,5000,action=="led0"?0:action=="led1"?1:-1);
         }else{s.send(400,"application/json","{\"error\":\"Unknown test.\"}");return;}
         s.send(200,"application/json","{\"ok\":true}");
     });

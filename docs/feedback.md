@@ -23,3 +23,12 @@ directions and rhythms instead of introducing a new tune for every feature.
 
 The explicit speaker hardware test is separate from muted event cues. Device lab
 LED tests last five seconds; automatic event flashes last one second.
+
+Since 0.11.0, menu selection owns the LEDs while a menu is idle: steady red,
+yellow, green, blue or white, matching the labelled screen blocks. Event sounds
+still play but their LED flashes cannot obscure the selection. Lab LED tests
+are rejected while choosing from a menu. Exit the menu to test individual LEDs.
+The pinned M5Unified IDF4 encoder was unimplemented; a two-pixel GRB driver now
+uses the Arduino legacy RMT API on GPIO21 at bounded brightness. The main task
+owns all LED writes. `/api/device` reports `ledReady`; physical colour/order
+and visibility still need checking on installation.

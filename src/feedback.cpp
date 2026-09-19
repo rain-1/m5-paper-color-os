@@ -1,6 +1,7 @@
 #include "feedback.h"
 #include <M5Unified.h>
 #include <Preferences.h>
+#include "status_light.h"
 
 namespace Feedback {
 namespace {
@@ -20,9 +21,10 @@ QueueHandle_t queue=nullptr;
 bool audible=true, storage=false, active=false;
 Cue current=Cue::Connected;
 uint8_t nextNote=0;
-uint32_t nextAt=0, lightUntil=0;
+uint32_t nextAt=0;
 }
 void begin(){
+    StatusLight::begin();
     queue=xQueueCreate(1,sizeof(Cue));
     storage=settings.begin("paper-ui",false);
     if(storage)audible=settings.getBool("sounds",true);
@@ -42,9 +44,7 @@ void tick(){
         current=incoming;nextNote=0;nextAt=now;active=true;
         M5.Speaker.stop();
         const auto& motif=motifs[static_cast<unsigned>(current)];
-        M5.Led.setBrightness(40);
-        M5.Led.setAllColor(motif.red,motif.green,motif.blue);
-        lightUntil=now+1000;
+        StatusLight::flash((uint32_t(motif.red)<<16)|(uint32_t(motif.green)<<8)|motif.blue,1000);
     }
     if(active && int32_t(now-nextAt)>=0){
         const auto& motif=motifs[static_cast<unsigned>(current)];
@@ -53,6 +53,5 @@ void tick(){
         nextAt=now+note.duration+65;
         active=nextNote<motif.count;
     }
-    if(lightUntil && int32_t(now-lightUntil)>=0){M5.Led.setAllColor(0,0,0);lightUntil=0;}
 }
 }

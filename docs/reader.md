@@ -1,4 +1,4 @@
-# TXT reader — firmware 0.4.0
+# TXT reader and colour menus — firmware 0.11.0
 
 Open `/books` on the device's local address. Import a `.txt`, inspect the prepared
 preview, save it, then choose **Read**. No internet or cloud service is involved.
@@ -19,11 +19,24 @@ trigger short-press actions. While a reader refresh is pending, new reader actio
 are rejected, preventing accidental queued page turns. Bookmarking does not need
 a screen refresh; the saved sound confirms it. Sounds can be muted in `/device`.
 
-The menu contains Continue reading, Library, Reading font, Font comparison sheet,
-Bookmark this page, Go to bookmark, and Device information (battery, address,
-version and controls). Browser controls also offer direct page jumps. A/B wrap
-around menu lists, but stop at the first/last book page. Library lists scroll in
-groups of seven. C returns from the comparison sheet or information screen.
+Menus are fixed coloured blocks with a colour name and row number; there is no
+moving on-screen highlight. Both RGB LEDs show the selected row. Root menu:
+red Continue reading, yellow Library, green Fonts, blue Bookmarks, white Device.
+Fonts opens Choose reading font / Font comparison sheet; Bookmarks opens Save / Recall.
+
+In menus, single A/B moves up/down without scheduling any display refresh.
+Double A chooses; double B goes back. C also chooses immediately. A single tap
+is delayed 350 ms to distinguish doubles; long holds cancel pending taps.
+The LED is steady while choosing and takes priority over notification flashes.
+Selecting or exiting a menu may refresh the screen. Back from the root returns
+to the loaded book, or Device information if no book is loaded.
+
+Lists of up to five items use all five colour rows. Larger libraries show four
+books plus an explicit More choice, which refreshes to the next group (wrapping
+after the last). Moving across the last row only wraps the LED, not the screen.
+Browser previous/next actions use the same no-refresh menu dispatch. Reading
+page turns remain immediate single A/B actions, stopping at the book boundaries.
+C returns from the comparison sheet or information screen to the root menu.
 
 ## Typography and pagination
 
@@ -36,8 +49,9 @@ blank paragraphs, and reserves space for title, page count and battery estimate.
 Positions and one optional bookmark **per book** are byte offsets, not page
 numbers. Changing font reflows the book and selects the page containing the old
 offset. This may move back a few lines. Each completed reading refresh saves the
-current position in internal NVS, along with the last book. Restart restores that
-book when normally booting with saved Wi-Fi credentials. Network connection
+current position in internal NVS, along with the last book. Normal startup with
+saved Wi-Fi credentials opens the colour menu, not the book. Continue reading
+opens the saved book and position on demand. Network connection
 changes do not replace an active reader page. Hold B explicitly to see setup.
 Power loss during refresh can return to the preceding saved page. This is not
 a power-failure guarantee for either NVS or the FAT filesystem.
@@ -69,7 +83,8 @@ remove books, power off before removing the SD card, and move/delete matching
 The pinned M5GFX `Panel_ED2208` implementation sends the entire framebuffer and
 performs the panel refresh even for rectangle display requests. Its fast/fastest
 modes change conversion, not a separate fast partial-refresh waveform. The reader
-uses black and white with fastest conversion; pictures retain quality mode.
+uses no-dither conversion, as do prepared pictures. Colour menu blocks use the
+panel's native red/yellow/green/blue/white palette. No accelerated timing is enabled.
 Allow roughly 15–30 seconds per physical update. Smaller rectangles do **not**
 currently produce fast page turns. This is a colour picture panel, not a typical
 fast monochrome e-reader panel.

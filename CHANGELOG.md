@@ -5,6 +5,16 @@ compatibility, minor changes add features, patch changes fix or refine behaviour
 The current API and device screen use the same version. Release binaries are
 application images for the existing 16 MB partition layout.
 
+## 0.11.0
+
+- Fixed five-colour menu blocks with matching LED selection; menu up/down never
+  queues an e-paper update. Double A selects, double B goes back, C still selects.
+- Five-item root groups Fonts and Bookmarks into submenus. Larger libraries use
+  explicit More-page selection; no implicit screen refresh while moving.
+- Startup opens the menu instead of the last book; Continue restores its place.
+- Replace the nonfunctional pinned IDF4 LED encoder with Arduino legacy RMT;
+  menu colour overrides transient cues. No panel clock/waveform changes.
+
 ## 0.10.0
 
 - Five Wi-Fi profiles in versioned internal NVS, with migration of the old single

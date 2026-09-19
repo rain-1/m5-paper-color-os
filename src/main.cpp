@@ -14,6 +14,8 @@
 #include "reader.h"
 #include "refresh_test.h"
 #include "wifi_profiles.h"
+#include "menu_input.h"
+#include "status_light.h"
 
 namespace {
 constexpr uint32_t CONNECT_TIMEOUT = 30000;
@@ -357,7 +359,7 @@ void setup() {
         splash.boot = true;
         xQueueOverwrite(screenQueue, &splash);
         connectSaved();
-        Reader::resumeLast();
+        Reader::request(Reader::Action::Menu);
     }
     else startPortal();
 }
@@ -365,33 +367,47 @@ void setup() {
 void loop() {
     M5.update();
     static bool aLong=false,bLong=false,cLong=false;
+    static MenuInput::Clicks clicks;
     auto readerAction=[](Reader::Action action) {
         if (!Reader::request(action)) Feedback::play(Feedback::Cue::Busy);
     };
+    auto menuEvent=[&](MenuInput::Event event){
+        switch(event){
+            case MenuInput::Event::Up:readerAction(Reader::Action::Previous);break;
+            case MenuInput::Event::Down:readerAction(Reader::Action::Next);break;
+            case MenuInput::Event::Choose:readerAction(Reader::Action::Select);break;
+            case MenuInput::Event::Back:readerAction(Reader::Action::Back);break;
+            default:break;
+        }
+    };
+    if(!Reader::menuPicking())clicks.clear();
     if (M5.BtnA.pressedFor(2500) && !aLong) {
-        aLong=true;
+        aLong=true;clicks.clear();
         if (Reader::active()) readerAction(Reader::Action::Bookmark);
     }
     if (M5.BtnB.pressedFor(2500) && !bLong) {
-        bLong=true;
+        bLong=true;clicks.clear();
         if (Reader::busy()) Feedback::play(Feedback::Cue::Busy);
         else { Reader::leave(); if (portal) showScreen(true); else startPortal(); }
     }
     if (M5.BtnC.pressedFor(2500)) cLong=true;
     deviceTick();
     Feedback::tick();
+    StatusLight::tick(Reader::menuSelection());
     if (M5.BtnA.wasReleased()) {
-        if (!aLong) { if (Reader::active()) readerAction(Reader::Action::Previous); else showScreen(portal); }
+        if (!aLong) { if(Reader::menuPicking())menuEvent(clicks.release(0,millis()));else if (Reader::active()) readerAction(Reader::Action::Previous); else showScreen(portal); }
         aLong=false;
     }
     if (M5.BtnB.wasReleased()) {
-        if (!bLong) readerAction(Reader::active()?Reader::Action::Next:Reader::Action::Menu);
+        if (!bLong){if(Reader::menuPicking())menuEvent(clicks.release(1,millis()));else readerAction(Reader::active()?Reader::Action::Next:Reader::Action::Menu);}
         bLong=false;
     }
     if (M5.BtnC.wasReleased()) {
+        clicks.clear();
         if (!cLong) readerAction(Reader::active()?Reader::Action::Select:Reader::Action::Menu);
         cLong=false;
     }
+    if(Reader::menuPicking()&&!M5.BtnA.isPressed()&&!M5.BtnB.isPressed())menuEvent(clicks.tick(millis()));
     if (portal) dns.processNextRequest();
     server.handleClient();
     if (pendingConnect) { pendingConnect = false; beginConnection(true); }

@@ -120,7 +120,22 @@ can be considered implemented on hardware. Audible cues remain independent.
 - Accelerated transitions between the new full-page patterns await user testing;
   no claim of visual quality is made from timing/status telemetry alone.
 
-## 0.10.0 five Wi-Fi profiles — host verified, pending installation
+## 0.11.0 LED menu selection — host verified, pending installation
+
+- Host tests exercise delayed singles/double select/back, long-hold cancellation,
+  timer rollover, wraparound and all library sizes through 64 entries.
+- The actual Reader::request dispatcher is compiled against a host scheduler fake:
+  repeated moves in every menu schedule zero screen requests; choose/back and
+  reading-page turns schedule rendering; busy/fault guards remain effective.
+- Firmware build and reader/converter regression tests pass. Hardware LED colour,
+  colour-block legibility, gesture feel and physical menu behaviour await testing.
+- Replaced all M5.Led calls with a single main-task-owned legacy RMT implementation;
+  no changes to display refresh clocks, voltage commands or waveform tables.
+
+## 0.10.0 five Wi-Fi profiles — installed
+
+- OTA installed successfully; live API confirmed 0.10.0, reconnection using
+  existing credentials and OTA relocked. Multi-location failover remains untested.
 
 - Firmware build passed (1,161,737-byte application); converter regression passes.
 - ASan/UBSan profile tests cover the legacy 97-byte credential layout, migration

@@ -83,6 +83,11 @@ Press top **C** to enter the reader menu. Outside the reader, **A** refreshes st
 Inside the reader, **A/B** turn pages or navigate and **C** chooses. With the display
 upright and USB at the bottom, **A** is upper-left, **B** is lower-left, and **C** is
 the single button on the top edge. Hold **B** to reconfigure Wi-Fi.
+Menus have fixed coloured blocks; the RGB LEDs indicate selection. Single A/B
+changes only the LED (350 ms double-tap window); double A chooses and double B
+goes back. C remains an immediate choose shortcut. Only choosing/back or explicit
+More-page selection refreshes the menu. Startup shows the menu rather than
+automatically opening the last book; Continue reading restores your place.
 Hold **C** for 2.5 seconds to unlock firmware updates for two
 minutes; a short beep and green LED flash confirm that you can release it.
 The lab page shows the remaining time.

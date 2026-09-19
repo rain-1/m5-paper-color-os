@@ -6,6 +6,7 @@
 #include "version.h"
 #include "reader_page.h"
 #include "refresh_test.h"
+#include "menu_input.h"
 #include <SD.h>
 #include <Preferences.h>
 #include <WiFi.h>
@@ -13,7 +14,8 @@
 
 namespace Reader {
 namespace {
-enum class View { Menu, Library, Reading, Fonts, Sampler, Info };
+enum class View { Menu, Library, Reading, Fonts, Sampler, Info, FontMenu, Bookmarks };
+bool listView(View v){return v==View::Menu||v==View::Library||v==View::Fonts||v==View::FontMenu||v==View::Bookmarks;}
 struct Book { String id,title; uint32_t size; };
 struct Progress { uint32_t magic=0x42524b31, offset=0, bookmark=UINT32_MAX; };
 struct Command { Action action; char id[9]; uint32_t value; bool wasActive; };
@@ -23,6 +25,7 @@ struct Snapshot {
     uint32_t page=0,pages=0,offset=0,bookmark=UINT32_MAX;
     uint8_t font=0;
     View view=View::Menu;
+    unsigned selection=0,count=0;
 };
 struct FontChoice { const lgfx::IFont* font; const char* label; };
 const FontChoice fontChoices[]={
@@ -33,7 +36,7 @@ const FontChoice fontChoices[]={
     {&fonts::FreeMono12pt7b,"Typewriter / 12 pt"}
 };
 constexpr unsigned fontCount=sizeof(fontChoices)/sizeof(fontChoices[0]);
-const char* menuItems[]={"Continue reading","Library","Reading font","Font comparison sheet","Bookmark this page","Go to bookmark","Device information"};
+const char* menuItems[]={"Continue reading","Library","Fonts","Bookmarks","Device information"};
 Preferences settings;
 SemaphoreHandle_t stateMutex;
 Snapshot snapshot;
@@ -42,6 +45,7 @@ void (*scheduleScreen)()=nullptr;
 bool storage=false,saveAfterDisplay=false;
 View view=View::Menu;
 unsigned selection=0,fontIndex=0;
+unsigned listPage=0,listCount=0;
 std::vector<Book> books;
 char* text=nullptr;
 size_t textSize=0,pageIndex=0;
@@ -61,6 +65,7 @@ void publish(){
     snapshot.page=pages.empty()?0:pageIndex+1;snapshot.pages=pages.size();
     snapshot.offset=pages.empty()?0:pages[pageIndex];snapshot.bookmark=progress.bookmark;snapshot.font=fontIndex;
     snapshot.view=view;
+    snapshot.selection=selection;snapshot.count=listView(view)?listCount:0;
     xSemaphoreGive(stateMutex);
 }
 String path(const String& id){return "/books/"+id+".txt";}
@@ -138,15 +143,21 @@ void heading(M5Canvas& c,const char* title){
 void footer(M5Canvas& c,const String& text){c.setFont(&fonts::Font2);c.drawFastHLine(24,551,352,BLACK);c.drawString(text,24,564);}
 void drawList(M5Canvas& c,const char* title,const std::vector<String>& rows){
     heading(c,title);c.setFont(&fonts::FreeSans12pt7b);
-    unsigned start=(selection/7)*7;
+    unsigned start=rows.size()>5?listPage*4:0;
+    unsigned visible=rows.size()>5?std::min(size_t(4),rows.size()-start):rows.size();
+    listCount=MenuInput::count(rows.size(),listPage);
     if(rows.empty())c.drawString("No books yet. Open /books",24,112);
-    for(unsigned i=start;i<rows.size()&&i<start+7;++i){
-        int y=95+(i-start)*57;
-        if(i==selection){c.fillRoundRect(18,y-5,364,48,5,BLACK);c.setTextColor(WHITE,BLACK);}
-        else c.setTextColor(BLACK,WHITE);
-        c.drawString(fit(c,rows[i],338),30,y);
+    for(unsigned i=0;i<listCount;++i){
+        int y=90+i*83;auto bg=MenuInput::colours[i];
+        c.fillRoundRect(18,y,364,73,5,bg);c.drawRoundRect(18,y,364,73,5,BLACK);
+        c.setTextColor(i==3?WHITE:BLACK,bg);
+        c.setFont(&fonts::Font2);c.drawString(String(i+1)+" / "+MenuInput::names[i],30,y+5);
+        c.setFont(&fonts::FreeSans12pt7b);
+        c.drawString(fit(c,i<visible?rows[start+i]:String("More books (next page)"),338),30,y+31);
     }
-    c.setTextColor(BLACK,WHITE);footer(c,"A: up     B: down     C: choose");
+    c.setTextColor(BLACK,WHITE);c.setFont(&fonts::Font2);
+    c.drawString("LED = selection / A up / B down",24,518);
+    footer(c,"AA: choose / BB: back / C: choose");
 }
 }
 
@@ -160,18 +171,28 @@ void begin(void (*schedule)()){
 }
 bool active(){return stateMutex && state().active;}
 bool busy(){return stateMutex && state().busy;}
+int menuSelection(){if(!stateMutex)return -1;auto s=state();return s.active&&!s.busy&&listView(s.view)&&s.count?int(s.selection):-1;}
+bool menuPicking(){if(!stateMutex)return false;auto s=state();return s.active&&!s.busy&&listView(s.view);}
 void leave(){if(!stateMutex)return;xSemaphoreTake(stateMutex,portMAX_DELAY);snapshot.active=false;xSemaphoreGive(stateMutex);}
 void resumeLast(){if(!lastId.isEmpty())request(Action::Resume);}
 bool request(Action action,const char* id,uint32_t value){
     if(!stateMutex||!scheduleScreen||RefreshTest::faulted())return false;
     xSemaphoreTake(stateMutex,portMAX_DELAY);
     if(snapshot.busy){xSemaphoreGive(stateMutex);return false;}
+    if(snapshot.active&&listView(snapshot.view)&&(action==Action::Previous||action==Action::Next)){
+        snapshot.selection=MenuInput::move(snapshot.selection,snapshot.count,action==Action::Next);
+        xSemaphoreGive(stateMutex);return true; // No display scheduling or SD work.
+    }
+    if(action==Action::Select&&listView(snapshot.view))value=snapshot.selection;
     pending={action,{},value,snapshot.active};snapshot.busy=true;snapshot.active=true;strlcpy(pending.id,id,sizeof(pending.id));
     xSemaphoreGive(stateMutex);scheduleScreen();return true;
 }
 
 bool render(M5Canvas& canvas,int battery){
-    xSemaphoreTake(stateMutex,portMAX_DELAY);Command cmd=pending;xSemaphoreGive(stateMutex);
+    xSemaphoreTake(stateMutex,portMAX_DELAY);Command cmd=pending;
+    if(listView(snapshot.view))selection=snapshot.selection;
+    xSemaphoreGive(stateMutex);
+    if(cmd.action==Action::Select&&listView(view))selection=cmd.value;
     message="";saveAfterDisplay=false;
     auto bookmark=[&]{
         if(pages.empty()){message="Open a book before setting a bookmark.";return;}
@@ -184,7 +205,12 @@ bool render(M5Canvas& canvas,int battery){
         case Action::TestNormal:case Action::TestAccelerated:
             view=View::Info;selection=0;publish();
             RefreshTest::run(canvas,cmd.action==Action::TestAccelerated,cmd.value);return false;
-        case Action::Menu:view=View::Menu;selection=0;break;
+        case Action::Menu:view=View::Menu;selection=listPage=0;break;
+        case Action::Back:
+            if(view==View::Fonts||view==View::Sampler)view=View::FontMenu;
+            else if(view==View::Menu)view=pages.empty()?View::Info:View::Reading;
+            else view=View::Menu;
+            selection=listPage=0;break;
         case Action::Resume:if(!currentId.isEmpty()&&!pages.empty())view=View::Reading;else if(!loadBook(lastId,canvas))view=View::Menu;break;
         case Action::Open:if(!loadBook(cmd.id,canvas))view=View::Menu;break;
         case Action::Sampler:view=View::Sampler;break;
@@ -208,7 +234,7 @@ bool render(M5Canvas& canvas,int battery){
                 if((delta<0&&pageIndex==0)||(delta>0&&pageIndex+1>=pages.size())){message=delta<0?"Beginning of book.":"End of book.";publish();Feedback::play(Feedback::Cue::Busy);return false;}
                 pageIndex+=delta;
             }else{
-                size_t count=view==View::Library?books.size():view==View::Fonts?fontCount:7;
+                size_t count=view==View::Library?books.size():view==View::Fonts?fontCount:view==View::FontMenu||view==View::Bookmarks?2:5;
                 if(view==View::Info||view==View::Sampler){view=View::Menu;selection=0;}
                 else if(count)selection=(selection+count+delta)%count;
             }
@@ -216,7 +242,13 @@ bool render(M5Canvas& canvas,int battery){
         }
         case Action::Select:
             if(view==View::Reading||view==View::Info||view==View::Sampler){view=View::Menu;selection=0;}
-            else if(view==View::Library){if(!books.empty())loadBook(books[selection%books.size()].id,canvas);else{view=View::Menu;selection=0;}}
+            else if(view==View::Library){
+                if(books.empty()){view=View::Menu;selection=0;}
+                else if(books.size()>5&&selection==listCount-1){listPage=(listPage+1)%((books.size()+3)/4);selection=0;}
+                else loadBook(books[(books.size()>5?listPage*4:0)+selection].id,canvas);
+            }
+            else if(view==View::FontMenu){view=selection==0?View::Fonts:View::Sampler;selection=fontIndex;}
+            else if(view==View::Bookmarks){if(selection==0)bookmark();else recall();}
             else if(view==View::Fonts){
                 uint32_t offset=pages.empty()?0:pages[pageIndex];fontIndex=selection%fontCount;
                 if(storage)settings.putUChar("font",fontIndex);
@@ -225,12 +257,10 @@ bool render(M5Canvas& canvas,int battery){
             }else{
                 switch(selection){
                     case 0:if(!currentId.isEmpty()&&!pages.empty())view=View::Reading;else loadBook(lastId,canvas);break;
-                    case 1:scanLibrary();view=View::Library;selection=0;break;
-                    case 2:view=View::Fonts;selection=fontIndex;break;
-                    case 3:view=View::Sampler;break;
-                    case 4:bookmark();break;
-                    case 5:recall();break;
-                    case 6:view=View::Info;break;
+                    case 1:scanLibrary();view=View::Library;selection=listPage=0;break;
+                    case 2:view=View::FontMenu;selection=0;break;
+                    case 3:view=View::Bookmarks;selection=0;break;
+                    case 4:view=View::Info;break;
                 }
             }
             break;
@@ -259,7 +289,9 @@ bool render(M5Canvas& canvas,int battery){
         std::vector<String> rows;
         if(view==View::Library){for(const auto& book:books)rows.push_back(book.title);drawList(canvas,"Your library",rows);}
         else if(view==View::Fonts){for(const auto& font:fontChoices)rows.push_back(font.label);drawList(canvas,"Reading font",rows);}
-        else{for(const auto& item:menuItems)rows.push_back(item);drawList(canvas,"Reader",rows);}
+        else if(view==View::FontMenu){rows={"Choose reading font","Font comparison sheet"};drawList(canvas,"Fonts",rows);}
+        else if(view==View::Bookmarks){rows={"Bookmark this page","Go to bookmark"};drawList(canvas,"Bookmarks",rows);}
+        else{for(const auto& item:menuItems)rows.push_back(item);drawList(canvas,"Paper OS",rows);}
     }
     if(!message.isEmpty()){canvas.fillRect(20,554,360,46,WHITE);canvas.setFont(&fonts::Font2);canvas.setTextColor(BLACK,WHITE);canvas.drawString(fit(canvas,message,352),24,566);}
     publish();return true;
@@ -278,8 +310,8 @@ void routes(WebServer& server,const String& token){
         String body=String("{\"active\":")+(s.active?"true":"false")+",\"busy\":"+(s.busy?"true":"false");
         body+=",\"id\":\""+String(s.id)+"\",\"title\":\""+escaped(s.title)+"\",\"message\":\""+escaped(s.message)+"\"";
         body+=",\"page\":"+String(s.page)+",\"pages\":"+String(s.pages)+",\"offset\":"+String(s.offset)+",\"font\":"+String(s.font)+",\"hasBookmark\":"+(s.bookmark==UINT32_MAX?"false":"true")+"}";
-        const char* views[]={"menu","library","reading","fonts","sampler","info"};
-        body.remove(body.length()-1);body+=",\"view\":\""+String(views[unsigned(s.view)])+"\"}";
+        const char* views[]={"menu","library","reading","fonts","sampler","info","font-menu","bookmarks"};
+        body.remove(body.length()-1);body+=",\"view\":\""+String(views[unsigned(s.view)])+"\",\"selection\":"+String(s.selection)+",\"menuCount\":"+String(s.count)+"}";
         server.sendHeader("Cache-Control","no-store");server.send(200,"application/json",body);
     });
     server.on("/api/reader/action",HTTP_POST,[&server,&token]{
@@ -293,6 +325,7 @@ void routes(WebServer& server,const String& token){
         else if(action=="previous")cmd=Action::Previous;
         else if(action=="menu")cmd=Action::Menu;
         else if(action=="select")cmd=Action::Select;
+        else if(action=="back")cmd=Action::Back;
         else if(action=="resume")cmd=Action::Resume;
         else if(action=="bookmark")cmd=Action::Bookmark;
         else if(action=="recall")cmd=Action::Recall;
